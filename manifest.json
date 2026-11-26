@@ -1,7 +1,7 @@
 {
   "id": "video-note-studio",
   "name": "Video Note Studio",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "minAppVersion": "1.5.0",
   "description": "独立播放器窗口播放链接/本地视频；B站、抖音、公众号、网盘、网页贴链接转笔记；时间戳、AI 摘要、翻译、OCR、Canvas 拆解、拆书、使用习惯记录。",
   "author": "13793",
