@@ -1,0 +1,43 @@
+{
+  "inboxFolder": "Clippings",
+  "playerSplit": "split",
+  "timestampMode": "inapp",
+  "ytDlpPath": "yt-dlp",
+  "asrEnabled": true,
+  "pythonPath": "python",
+  "asrModel": "small",
+  "asrLanguage": "zh",
+  "lastAsrError": "python → 退出码 9009",
+  "subsLangs": "zh-Hans,zh-CN,zh,en",
+  "llmBaseUrl": "https://api.deepseek.com/v1",
+  "llmApiKey": "",
+  "llmModel": "deepseek-chat",
+  "visionModel": "",
+  "magpieEnabled": true,
+  "magpieBaseUrl": "http://127.0.0.1:3425/v1",
+  "magpieModel": "auto/deepseek-v4.1-flash",
+  "autoSummarize": true,
+  "autoTranslate": true,
+  "translateTo": "zh",
+  "autoCanvas": true,
+  "canvasFolder": "Canvas",
+  "ocrFolder": "Clippings/OCR",
+  "bookFolder": "Books",
+  "clipperCompat": true,
+  "clipperTags": "clippings",
+  "habitNote": "_meta/使用习惯.md",
+  "habitEnabled": true,
+  "habits": {
+    "counters": {
+      "player-load": 1
+    },
+    "events": [
+      {
+        "t": "2026-11-26T14:44:37.951Z",
+        "kind": "player-load"
+      }
+    ]
+  },
+  "biliCookies": {},
+  "biliUser": null
+}

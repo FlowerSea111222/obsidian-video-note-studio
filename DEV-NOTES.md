@@ -43,27 +43,25 @@ node deploy.mjs --check   # 只校验文件齐全，不复制
 OBSIDIAN_VAULT="D:\其它 Vault" node deploy.mjs
 ```
 
-## 4. 外部依赖现状（本机检测结果，2026-11-26）
+## 4. 外部依赖（2026-11-26 已装齐，实测跑通）
 
-| 依赖 | 现状 | 影响 |
+| 依赖 | 版本 / 路径 | 状态 |
 | --- | --- | --- |
-| `yt-dlp` | ❌ 未安装（不在 PATH） | 抓不到 B站/YouTube 字幕 |
-| `ffmpeg` | ❌ 未安装 | yt-dlp 音频转码失败 |
-| `python` | ❌ 只有 `%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe`（应用商店占位符，子进程返回 9009） | 本地 Whisper 转录起不来 |
-| `faster-whisper` | ❌ 未安装 | 同上 |
+| Python | 3.12.10 → `C:\Users\Administrator\AppData\Local\Programs\Python\Python312\python.exe` | ✅ winget 安装 |
+| faster-whisper | 1.2.1（ctranslate2 4.9.1、av 19.0.2、onnxruntime 1.32.0、numpy 2.5.5） | ✅ pip（阿里云源） |
+| opencc | 1.4.2（t2s 简繁统一） | ✅ pip（阿里云源） |
+| yt-dlp | 2026.11.23 → `C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Links\yt-dlp.exe` | ✅ winget 安装 |
+| ffmpeg | 9.1-full_build（Gyan）→ `...\WinGet\Links\ffmpeg.exe` | ✅ winget 安装 |
+| Whisper small 模型 | `C:\Users\Administrator\.cache\huggingface`（464 MB） | ✅ 已缓存 |
 
-补齐命令（管理员 PowerShell，按需）：
+已写进插件设置（`data.json`）：`pythonPath` / `ytDlpPath` 用绝对路径，`asrModel=small`、`asrLanguage=zh`、`asrEnabled=true`。
 
-```powershell
-winget install -e --id Python.Python.3.12
-winget install -e --id yt-dlp.yt-dlp
-winget install -e --id Gyan.FFmpeg
-python -m pip install -U faster-whisper
-```
+实测记录：`BV1rFWY6REYD`（1:36 中文讲解）→ yt-dlp 取音频 1.7 MB → ffmpeg 16 kHz 单声道 → small/int8 出 13 条带时间戳文本，
+Obsidian 内「生成笔记」成功写出 `## 时间戳`，前端 `## 概要`/`## 要点` 由 magpie 路由生成。冷启动（含 500 MB 模型下载）约 4 分钟，热跑 1 分钟级。
 
-装完在插件设置里把「Python 路径」填成真实解释器（如 `C:\Users\Administrator\AppData\Local\Programs\Python\Python312\python.exe`），
-点「测试本地转录」确认 Python / faster-whisper / asr_bridge.py 三项都就位。
-模型第一次用 `small` 会在 `~/.cache/huggingface` 下载约 500 MB。
+> ⚠️ 坑：pip 官方源可用，**清华 tuna 源会 reset**（`ConnectionResetError 10054`），本机用阿里云源
+> `-i https://mirrors.aliyun.com/pypi/simple/`。
+> 另：winget / Python 安装器会改用户 PATH，**已运行的 Obsidian 进程读不到新 PATH**，装完必须重启 Obsidian（或用注册表 PATH 显式起进程）。
 
 ## 5. 已知限制（上游自述，实测一致）
 
@@ -85,3 +83,13 @@ node deploy.mjs                 # 再同步到 vault
 ```bash
 git switch -c dev
 ```
+
+## 7. 已发现的上游小问题（二次开发候选）
+
+1. `main.js:3738` —— `fm.push("transcript: " + (parts.transcript.length ? "subtitle" : ...))`：
+   只要拿到任何转录就写 `transcript: subtitle`，本地 Whisper 转出来的也标成 subtitle。
+   建议改成记录真实来源（`subtitle` / `whisper` / `article`）。
+2. `main.js:2848-2860` 的「测试本地转录」只校验 `python` + `faster_whisper` + `opencc`，
+   **不校验 `ffmpeg` / `yt-dlp`**，所以 PATH 缺 ffmpeg 时测试通过但真正转录会失败。
+3. `asr_bridge.py` 里 `ffmpeg` 是裸命令名，没有配置项；PATH 变化必须重启 Obsidian，
+   建议加一个 `--ffmpeg` 参数并在设置里暴露。
