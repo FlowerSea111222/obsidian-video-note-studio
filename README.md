@@ -55,7 +55,22 @@ ffmpeg 仅 yt-dlp 的音频场景需要，本插件不直接调用。
 
 
 
-- **B站 多数视频没有 CC/AI 字幕**，`yt-dlp` 只能列出弹幕流，所以「B站 视频自动出逐句转录」这件事不成立；插件会如实写「没拿到字幕」，不会编造。
+## 本地转录（asr_bridge.py）
+
+B站 绝大多数视频没有 CC/AI 字幕，yt-dlp 只列得出弹幕流。所以插件带了一个本地转录桥：
+
+```
+yt-dlp 下音频 → ffmpeg 解成 16 kHz PCM → faster-whisper 逐段识别 → JSON 回给插件
+```
+
+- 文件：插件目录下的 `asr_bridge.py`，与 `main.js` 同级
+- 依赖：本机 Python 3 + `faster-whisper`（`pip install faster-whisper`），外加 `yt-dlp` 与 `ffmpeg`
+- 设置项：`没有字幕时用本地 Whisper 转录`、`Python 路径`、`Whisper 模型`、`转录语言`
+- 实测：4 分 54 秒的 B站 视频，`small` 模型在 CPU 上约 1 分钟出 29 行带时间戳文本
+
+## 已知限制（都是真的）
+
+- **B站 多数视频没有 CC/AI 字幕**，`yt-dlp` 只能列出弹幕流；插件会自动回退到本地 Whisper 转录，因此需要本机装好 Python + faster-whisper，没装时笔记里会写明卡在哪一步，不会给你一篇空壳。
 - **B站 iframe 不暴露播放进度**，时间戳按钮对 B站 使用的是内部计时器（近似值），可手动修正；YouTube 走官方 `postMessage` 取值，本地文件直接读 `<video>.currentTime`，都准确。
 - **抖音** 页面强依赖 JS，`requestUrl` 抓不到正文，通常只能拿到标题/封面；有 yt-dlp 时可尝试取字幕。
 - **网盘** 只做元数据与提取码识别（`提取码：xxxx`），不做下载。
