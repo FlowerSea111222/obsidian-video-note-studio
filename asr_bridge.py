@@ -36,10 +36,14 @@ def run_bytes(cmd, timeout=1800):
     return subprocess.run(cmd, capture_output=True, timeout=timeout)
 
 
-def download_audio(url, ytdlp, tmp):
+def download_audio(url, ytdlp, tmp, cookie=""):
     out = str(tmp / "audio.%(ext)s")
-    p = run_bytes([ytdlp, "-f", "bestaudio[ext=m4a]/bestaudio/best",
-                   "--no-warnings", "--no-playlist", "-o", out, url])
+    cmd = [ytdlp, "-f", "bestaudio[ext=m4a]/bestaudio/best",
+           "--no-warnings", "--no-playlist"]
+    if cookie:
+        cmd += ["--add-header", f"Cookie: {cookie}"]
+    cmd += ["-o", out, url]
+    p = run_bytes(cmd)
     files = [f for f in tmp.glob("audio.*") if f.is_file()]
     if not files:
         raise RuntimeError("音频下载失败: " + (p.stderr or b"").decode("utf-8", "replace")[-500:])
@@ -53,6 +57,20 @@ def load_audio(path, sr=16000):
     if p.returncode != 0 or not p.stdout:
         raise RuntimeError("ffmpeg 解码失败: " + (p.stderr or b"").decode("utf-8", "replace")[-400:])
     return np.frombuffer(p.stdout, dtype=np.int16).astype("float32") / 32768.0
+
+
+try:
+    from opencc import OpenCC
+    T2S = OpenCC("t2s")
+except Exception:
+    T2S = None
+
+
+def simplified(text):
+    """Whisper 在中文口音/中英混说时可能吐出繁体，统一转简体。"""
+    if not text:
+        return text
+    return T2S.convert(text) if T2S else text
 
 
 NOISE_RE = re.compile(r"^[\s♪🎵*\[\(（]*(music|音乐|applause|掌声|静音|silence)[\s♪🎵*\]\)）]*$", re.I)
@@ -89,12 +107,13 @@ def main():
     ap.add_argument("--model", default="small")
     ap.add_argument("--language", default="")
     ap.add_argument("--ytdlp", default="yt-dlp")
+    ap.add_argument("--cookie", default="")
     ap.add_argument("--timeout", type=int, default=1800)
     args = ap.parse_args()
 
     tmp = tempfile.mkdtemp(prefix="vns-asr-")
     try:
-        audio = download_audio(args.url, args.ytdlp, __import__("pathlib").Path(tmp))
+        audio = download_audio(args.url, args.ytdlp, __import__("pathlib").Path(tmp), args.cookie)
         log(f"[asr] 音频就绪 {audio.stat().st_size // 1024} KB")
         samples = load_audio(audio)
         log(f"[asr] 采样点 {len(samples)}")
@@ -110,7 +129,7 @@ def main():
             )
             got = []
             for seg in segs:
-                text = seg.text.strip()
+                text = simplified(seg.text.strip())
                 if text:
                     got.append([round(float(seg.start), 2), text])
             return got, info
