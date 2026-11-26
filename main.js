@@ -276,6 +276,7 @@ class VideoPlayerView extends ItemView {
     btn(actionBtns, "⏱ 时间戳", () => this.captureTimestamp(), "is-accent");
     btn(actionBtns, "笔记", () => this.openNote());
     btn(actionBtns, "生成笔记", () => this.plugin.importLink(this.link ? this.link.url : this.urlInput.value, { player: this }), "is-ghost");
+    btn(actionBtns, "Canvas", () => this.generateCanvas(), "is-ghost");
 
     // ─── 播放器舞台 ───
     this.stage = root.createDiv({ cls: "vns-stage" });
@@ -460,6 +461,26 @@ class VideoPlayerView extends ItemView {
     await this.plugin.insertIntoActiveNote(line, this.link);
     this.plugin.recordHabit("timestamp");
     new Notice(`已插入时间戳 ${fmtTime(t)}`);
+  }
+
+  async generateCanvas() {
+    const raw = this.link ? this.link.url : String(this.urlInput.value || "").trim();
+    if (!raw) { new Notice("先加载视频或粘贴链接"); return; }
+    this.setStatus("生成 Canvas…");
+    try {
+      const boundPath = this.notePath || (this.link && this.plugin.noteIndex.get(this.link.url));
+      let file = boundPath ? this.app.vault.getAbstractFileByPath(normalizePath(boundPath)) : null;
+      if (!(file instanceof TFile)) file = await this.plugin.importLink(raw, { player: this });
+      if (!(file instanceof TFile)) throw new Error("没有可用于拆解的笔记");
+      const markdown = await this.app.vault.read(file);
+      const canvasPath = await this.plugin.makeCanvas(file.basename, markdown, this.plugin.settings.canvasFolder);
+      const canvasFile = this.app.vault.getAbstractFileByPath(normalizePath(canvasPath));
+      if (canvasFile instanceof TFile) await this.app.workspace.getLeaf("tab").openFile(canvasFile);
+      this.setStatus("Canvas 已生成");
+    } catch (e) {
+      this.setStatus("Canvas 生成失败");
+      this.plugin.fail(e);
+    }
   }
 
   async openNote() {
