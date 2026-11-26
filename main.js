@@ -939,7 +939,13 @@ class VideoNoteStudio extends Plugin {
         if (parsed.error) throw new Error(parsed.error);
         this.settings.lastAsrError = "";
         await this.saveSettings();
-        return (parsed.segments || []).map((x) => [Number(x[0]), String(x[1])]);
+        const segs = (parsed.segments || []).map((x) => [Number(x[0]), String(x[1])]);
+        if (!segs.length) {
+          this.settings.lastAsrError = `识别到 0 段语音（语言检测 ${parsed.language || "?"}），这个视频大概率没人声/只有配乐`;
+          await this.saveSettings();
+          return [];
+        }
+        return segs;
       } catch (e) {
         lastErr = `${bin} → ${e.message}`;
         console.warn("[vns] 本地转录尝试失败", lastErr);
