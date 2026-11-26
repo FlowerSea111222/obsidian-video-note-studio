@@ -519,7 +519,42 @@ class VnsSettingTab extends PluginSettingTab {
       .addToggle((t) => t.setValue(!!s.magpieEnabled).onChange(async (v) => { s.magpieEnabled = v; await this.plugin.saveSettings(); this.display(); }));
     if (s.magpieEnabled) {
       text("magpie 地址", "magpieBaseUrl", "本机 magpie 网关的 OpenAI 兼容入口", "http://127.0.0.1:3425/v1");
-      text("magpie 模型", "magpieModel", "路由组或模型 id，例如 auto/deepseek-v4.1-flash", "auto/deepseek-v4.1-flash");
+
+      // 模型选择：下拉列表 + 刷新按钮
+      const modelSetting = new Setting(containerEl).setName("magpie 模型").setDesc("选择路由组或具体模型");
+      const select = modelSetting.controlEl.createEl("select", { cls: "dropdown vns-model-select" });
+      const currentModel = s.magpieModel || "auto/deepseek-v4.1-flash";
+      const cachedModels = (this.plugin.magpieModels || []);
+      const populateOptions = (models) => {
+        select.empty();
+        for (const m of models) {
+          const opt = select.createEl("option", { value: m, text: m });
+          if (m === currentModel) opt.selected = true;
+        }
+        // 当前模型不在列表里也要能选到
+        if (!models.includes(currentModel)) {
+          const opt = select.createEl("option", { value: currentModel, text: currentModel });
+          opt.selected = true;
+        }
+      };
+      populateOptions(cachedModels.length ? cachedModels : [currentModel]);
+      select.addEventListener("change", async () => {
+        s.magpieModel = select.value;
+        await this.plugin.saveSettings();
+      });
+
+      modelSetting.addButton((b) => b.setButtonText("刷新").onClick(async () => {
+        b.setDisabled(true);
+        b.setButtonText("拉取中…");
+        try {
+          const models = await this.plugin.fetchMagpieModels();
+          this.plugin.magpieModels = models;
+          populateOptions(models);
+          new Notice(`拉到 ${models.length} 个模型`);
+        } catch (e) { new Notice(`拉取失败：${e.message}`, 8000); }
+        finally { b.setDisabled(false); b.setButtonText("刷新"); }
+      }));
+
       new Setting(containerEl).setName("测试 magpie 连接").setDesc("发一条最小请求，确认网关可用")
         .addButton((b) => b.setButtonText("测试").onClick(async () => {
           b.setDisabled(true);
@@ -925,6 +960,14 @@ class VideoNoteStudio extends Plugin {
 
   /* ---------- 元数据 / 转录 ---------- */
   hasLlm() { return !!(this.settings.magpieEnabled || this.settings.llmApiKey); }
+
+  async fetchMagpieModels() {
+    const base = (this.settings.magpieBaseUrl || "http://127.0.0.1:3425/v1").replace(/\/+$/, "");
+    const res = await requestUrl({ url: `${base}/models`, method: "GET", throw: false });
+    if (res.status >= 400) throw new Error(`HTTP ${res.status}`);
+    const data = res.json || JSON.parse(res.text || "{}");
+    return (data.data || []).map((m) => m.id).filter(Boolean).sort();
+  }
 
   async requestJson(url, headers) {
     const res = await requestUrl({ url, method: "GET", throw: false, headers: headers || {} });
