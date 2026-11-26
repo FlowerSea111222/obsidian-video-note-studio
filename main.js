@@ -243,28 +243,64 @@ class VideoPlayerView extends ItemView {
     root.empty();
     root.addClass("vns-root");
 
-    const bar = root.createDiv({ cls: "vns-toolbar" });
-    this.urlInput = bar.createEl("input", { cls: "vns-url", type: "text",
-      placeholder: "粘贴链接（B站 / YouTube / 抖音 / 公众号 / 网盘 / 网页）或本地视频路径" });
+    // ─── 顶部工具栏 ───
+    const toolbar = root.createDiv({ cls: "vns-toolbar" });
+
+    // 第一行：URL 输入 + 加载按钮
+    const inputRow = toolbar.createDiv({ cls: "vns-input-row" });
+    this.urlInput = inputRow.createEl("input", {
+      cls: "vns-url", type: "text",
+      placeholder: "粘贴链接（B站 / YouTube / 抖音 / 公众号 / 网盘 / 网页）或本地路径…",
+    });
     this.urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") this.load(this.urlInput.value); });
 
-    const btn = (label, fn, cls) => {
-      const b = bar.createEl("button", { cls: `vns-btn ${cls || ""}`, text: label });
+    const btnGroup = inputRow.createDiv({ cls: "vns-btn-group" });
+    const btn = (parent, label, fn, cls) => {
+      const b = parent.createEl("button", { cls: `vns-btn ${cls || ""}`, text: label });
       b.addEventListener("click", fn);
       return b;
     };
-    btn("加载", () => this.load(this.urlInput.value), "is-accent");
-    btn("本地文件", () => this.plugin.pickLocalVideo((f) => this.loadFile(f)));
-    this.clockEl = bar.createEl("span", { cls: "vns-time", text: "0:00" });
-    btn("⏱ 时间戳", () => this.captureTimestamp(), "is-accent");
-    btn("打开笔记", () => this.openNote());
-    btn("生成笔记", () => this.plugin.importLink(this.link ? this.link.url : this.urlInput.value, { player: this }));
+    btn(btnGroup, "加载", () => this.load(this.urlInput.value), "is-accent");
+    btn(btnGroup, "本地", () => this.plugin.pickLocalVideo((f) => this.loadFile(f)));
 
+    // 第二行：元信息 + 操作按钮
+    const actionRow = toolbar.createDiv({ cls: "vns-action-row" });
+    this.metaEl = actionRow.createDiv({ cls: "vns-meta" });
+    this.metaEl.innerHTML = '<span class="vns-meta-placeholder">暂无视频</span>';
+
+    const actionBtns = actionRow.createDiv({ cls: "vns-btn-group" });
+    btn(actionBtns, "⏱ 时间戳", () => this.captureTimestamp(), "is-accent");
+    btn(actionBtns, "笔记", () => this.openNote());
+    btn(actionBtns, "生成笔记", () => this.plugin.importLink(this.link ? this.link.url : this.urlInput.value, { player: this }), "is-ghost");
+
+    // ─── 播放器舞台 ───
     this.stage = root.createDiv({ cls: "vns-stage" });
     this.stage.createDiv({ cls: "vns-empty", text: "粘贴链接或选择本地视频开始" });
 
-    const hint = root.createDiv({ cls: "vns-hint" });
-    hint.innerHTML = "时间戳会插入到<b>当前绑定的笔记</b>；YTB/iframe 播放器读数靠官方 postMessage，读不到时用 <code>手动输入</code>。";
+    // ─── 底部状态栏 ───
+    const statusBar = root.createDiv({ cls: "vns-statusbar" });
+    this.clockEl = statusBar.createEl("span", { cls: "vns-time", text: "0:00 / 0:00" });
+    this.statusEl = statusBar.createEl("span", { cls: "vns-status", text: "就绪" });
+  }
+
+  updateMeta(link) {
+    if (!this.metaEl) return;
+    if (!link) {
+      this.metaEl.innerHTML = '<span class="vns-meta-placeholder">暂无视频</span>';
+      return;
+    }
+    const parts = [];
+    if (link.title) parts.push(`<span class="vns-meta-title">${link.title}</span>`);
+    const metaItems = [];
+    if (link.author) metaItems.push(link.author);
+    if (link.duration) metaItems.push(fmtTime(link.duration));
+    if (link.published) metaItems.push(link.published);
+    if (metaItems.length) parts.push(`<span class="vns-meta-sub">${metaItems.join(" · ")}</span>`);
+    this.metaEl.innerHTML = parts.join("");
+  }
+
+  setStatus(text) {
+    if (this.statusEl) this.statusEl.setText(text || "");
   }
 
   async load(input, startAt) {
@@ -303,19 +339,29 @@ class VideoPlayerView extends ItemView {
     this.stage.empty();
     this.videoEl = null;
     this.iframeEl = null;
+    this.setStatus("加载中…");
+    this.updateMeta(link);
 
     if (link.kind === "file") {
       const f = link.file || this.app.vault.getAbstractFileByPath(normalizePath(link.url));
-      if (!(f instanceof TFile)) { this.stage.createDiv({ cls: "vns-empty", text: "文件不可读" }); return; }
+      if (!(f instanceof TFile)) { this.stage.createDiv({ cls: "vns-empty", text: "文件不可读" }); this.setStatus("文件不可读"); return; }
       this.videoEl = this.stage.createEl("video", { attr: { controls: "true", playsinline: "true" } });
       this.videoEl.src = this.app.vault.getResourcePath(f);
       this.urlInput.value = f.path;
+      this.videoEl.addEventListener("loadedmetadata", () => {
+        this.setStatus("就绪");
+        this.updateMeta(link);
+      });
+      this.videoEl.addEventListener("play", () => this.setStatus("播放中"));
+      this.videoEl.addEventListener("pause", () => this.setStatus("已暂停"));
     } else {
       const src = embedFor(link, startAt);
       if (!src) {
         if (link.kind === "direct") {
           this.videoEl = this.stage.createEl("video", { attr: { controls: "true", playsinline: "true" } });
           this.videoEl.src = link.url;
+          this.videoEl.addEventListener("play", () => this.setStatus("播放中"));
+          this.videoEl.addEventListener("pause", () => this.setStatus("已暂停"));
         } else {
           this.stage.createDiv({ cls: "vns-empty", text: `${link.kind} 类型的链接无法内嵌播放，可「生成笔记」后跳浏览器观看` });
         }
@@ -327,6 +373,7 @@ class VideoPlayerView extends ItemView {
       this.urlInput.value = link.url;
     }
 
+    this.setStatus("就绪");
     this.timer = setInterval(() => this.tick(), 500);
     this.updateClock();
   }
@@ -365,7 +412,12 @@ class VideoPlayerView extends ItemView {
   }
 
   updateClock() {
-    if (this.clockEl) this.clockEl.textContent = fmtTime(this.lastKnownTime);
+    if (!this.clockEl) return;
+    const t = this.currentTime();
+    const dur = this.videoEl ? this.videoEl.duration : (this.link ? this.link.duration || 0 : 0);
+    const tStr = fmtTime(t);
+    const dStr = dur && !isNaN(dur) ? fmtTime(dur) : "";
+    this.clockEl.textContent = dStr ? `${tStr} / ${dStr}` : tStr;
   }
 
   currentTime() {
