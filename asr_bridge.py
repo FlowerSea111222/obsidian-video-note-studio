@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""asr_bridge.py — 给 Obsidian 插件用的本地转录桥。
+
+用法：
+  python asr_bridge.py --url <视频链接> [--model small] [--language zh] [--ytdlp yt-dlp]
+
+输出（stdout 最后一行）：{"segments": [[秒, "文本"], ...], "language": "zh", "duration": 294.3}
+日志一律走 stderr，不影响插件解析。
+"""
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+os.environ.setdefault("HF_HUB_OFFLINE", "0")
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
+
+def log(msg):
+    print(msg, file=sys.stderr, flush=True)
+
+
+def run_bytes(cmd, timeout=1800):
+    log("$ " + " ".join(cmd))
+    return subprocess.run(cmd, capture_output=True, timeout=timeout)
+
+
+def download_audio(url, ytdlp, tmp):
+    out = str(tmp / "audio.%(ext)s")
+    p = run_bytes([ytdlp, "-f", "bestaudio[ext=m4a]/bestaudio/best",
+                   "--no-warnings", "--no-playlist", "-o", out, url])
+    files = [f for f in tmp.glob("audio.*") if f.is_file()]
+    if not files:
+        raise RuntimeError("音频下载失败: " + (p.stderr or b"").decode("utf-8", "replace")[-500:])
+    return files[0]
+
+
+def load_audio(path, sr=16000):
+    import numpy as np
+    p = run_bytes(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
+                   "-i", str(path), "-f", "s16le", "-ac", "1", "-ar", str(sr), "-"])
+    if p.returncode != 0 or not p.stdout:
+        raise RuntimeError("ffmpeg 解码失败: " + (p.stderr or b"").decode("utf-8", "replace")[-400:])
+    return np.frombuffer(p.stdout, dtype=np.int16).astype("float32") / 32768.0
+
+
+def merge(items, min_chars=24, max_gap=8.0, max_chars=140):
+    out = []
+    for start, text in items:
+        if out:
+            ls, lt = out[-1]
+            ended = bool(re.search(r"[。？！?!.；;]$", lt)) and len(lt) >= min_chars
+            if (not ended and len(lt) < max_chars and len(lt) < min_chars * 4
+                    and start - ls <= max_gap and len(lt) + len(text) <= max_chars):
+                out[-1] = [ls, (lt + " " + text).strip()]
+                continue
+        out.append([start, text])
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--url", required=True)
+    ap.add_argument("--model", default="small")
+    ap.add_argument("--language", default="")
+    ap.add_argument("--ytdlp", default="yt-dlp")
+    ap.add_argument("--timeout", type=int, default=1800)
+    args = ap.parse_args()
+
+    tmp = tempfile.mkdtemp(prefix="vns-asr-")
+    try:
+        audio = download_audio(args.url, args.ytdlp, __import__("pathlib").Path(tmp))
+        log(f"[asr] 音频就绪 {audio.stat().st_size // 1024} KB")
+        samples = load_audio(audio)
+        log(f"[asr] 采样点 {len(samples)}")
+
+        from faster_whisper import WhisperModel
+        model = WhisperModel(args.model, device="cpu", compute_type="int8")
+        lang = args.language or None
+        segments, info = model.transcribe(
+            samples, language=lang, vad_filter=True, beam_size=5,
+            condition_on_previous_text=False,
+        )
+        items = []
+        for seg in segments:
+            text = seg.text.strip()
+            if text:
+                items.append([round(float(seg.start), 2), text])
+        items = merge(items)
+        payload = {
+            "segments": items,
+            "language": getattr(info, "language", ""),
+            "duration": round(float(getattr(info, "duration", 0) or 0), 2),
+            "count": len(items),
+        }
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
+    except Exception as exc:
+        print(json.dumps({"error": str(exc)}, ensure_ascii=False))
+        log(f"[error] {exc}")
+        return 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
