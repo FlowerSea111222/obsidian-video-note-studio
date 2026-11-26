@@ -51,8 +51,6 @@
   cursor: pointer;
   transition: background 120ms ease, box-shadow 120ms ease;
   white-space: nowrap;
-}
-.vns-btn:hover {
   background: var(--interactive-hover);
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
