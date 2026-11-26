@@ -19,6 +19,9 @@
 | 9 | 使用习惯记录 | 自动统计命令频次，命令 `生成使用习惯笔记` 落成一份 md |
 | 10 | 兼容 Obsidian Web Clipper | 设置开关；生成的笔记沿用 `source/created/tags: clippings` 字段，另有命令 `补全 Clippings 里的视频剪藏` |
 | 11 | 拆书 | 命令 `拆书：书籍转章节笔记`，支持 `md / txt / epub`，每章一篇 + 索引 |
+| 12 | B站扫码登录 | 播放器或设置里点「B站登录」，手机扫码确认；登录后播放器使用账号可用清晰度（大会员画质仍需对应账号） |
+| 13 | magpie 路由 | 设置里开「使用 magpie 路由」，直连本机 magpie 网关，无需 API Key；模型可下拉选择 |
+| 14 | 简繁体统一 | 转录/摘要/翻译/拆书统一输出简体中文（Whisper 经 OpenCC 转换） |
 
 ## 安装（手动）
 
@@ -57,13 +60,13 @@ ffmpeg 仅 yt-dlp 的音频场景需要，本插件不直接调用。
 
 ## 本地转录（asr_bridge.py）
 
-B站 绝大多数视频没有 CC/AI 字幕，yt-dlp 只列得出弹幕流。所以插件带了一个本地转录桥：
+B站 绝大多数视频没有 CC/AI 字幕，yt-dlp 只列得出弹幕流。所以插件带了一个本地转录桥（已内嵌进 `main.js`，不依赖额外文件）：
 
 ```
-yt-dlp 下音频 → ffmpeg 解成 16 kHz PCM → faster-whisper 逐段识别 → JSON 回给插件
+yt-dlp 下音频 → ffmpeg 解成 16 kHz PCM → faster-whisper 逐段识别 → OpenCC 简繁统一 → JSON 回给插件
 ```
 
-- 文件：插件目录下的 `asr_bridge.py`，与 `main.js` 同级
+- 文件：插件目录下的 `asr_bridge.py`（也内嵌在 `main.js` 里，官方安装器只装 `main.js`/`manifest.json`/`styles.css` 也能跑）
 - 依赖：本机 Python 3 + `faster-whisper`（`pip install faster-whisper`），外加 `yt-dlp` 与 `ffmpeg`
 - 设置项：`没有字幕时用本地 Whisper 转录`、`Python 路径`、`Whisper 模型`、`转录语言`
 - 实测：4 分 54 秒的 B站 视频，`small` 模型在 CPU 上约 1 分钟出 29 行带时间戳文本
