@@ -77,14 +77,24 @@
   color: var(--text-normal);
 }
 
-/* 操作行（元信息 + 按钮） */
+/* 操作行：主操作与笔记操作分区 */
 .vns-action-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 32px;
+}
+.vns-primary-actions, .vns-secondary-actions {
+  display: flex; align-items: center; gap: 6px;
+}
+.vns-secondary-actions { justify-content: flex-end; flex-wrap: wrap; }
+.vns-primary-actions { flex-shrink: 0; }
+
+/* 元信息与账号状态独立成行 */
+.vns-meta-row {
   display: flex; align-items: center; gap: 12px;
-  min-height: 28px;
+  padding-top: 7px;
+  border-top: 1px solid var(--background-modifier-border);
 }
-.vns-action-row .vns-btn-group {
-  flex-wrap: wrap; justify-content: flex-end;
-}
+.vns-login-btn { flex-shrink: 0; font-size: 11px; padding: 2px 8px; }
 
 /* 元信息 */
 .vns-meta {
@@ -102,6 +112,15 @@
   font-size: 11px; color: var(--text-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* B站扫码登录 */
+.vns-login-modal { text-align: center; padding: 8px 20px 20px; }
+.vns-login-qr { display: flex; justify-content: center; margin: 14px 0; min-height: 220px; }
+.vns-login-qr svg { width: 220px; height: 220px; background: #fff; border-radius: 10px; }
+.vns-login-status { font-size: 13px; color: var(--text-normal); margin-top: 8px; }
+.vns-login-account { font-size: 15px; font-weight: 600; margin: 14px 0 8px; }
+.vns-login-actions { display: flex; justify-content: center; gap: 8px; margin-top: 18px; }
+.vns-login-error { color: var(--text-error); font-size: 13px; margin: 14px 0; overflow-wrap: anywhere; }
 
 /* ── 播放器舞台 ── */
 .vns-stage {
@@ -147,6 +166,8 @@
   .vns-input-row { flex-direction: column; align-items: stretch; }
   .vns-btn-group { justify-content: flex-end; }
   .vns-action-row { flex-direction: column; align-items: stretch; gap: 6px; }
+  .vns-primary-actions, .vns-secondary-actions { justify-content: flex-start; flex-wrap: wrap; }
+  .vns-meta-row { flex-wrap: wrap; }
   .vns-meta { flex-direction: row; gap: 8px; align-items: center; }
   .vns-meta-title { flex: 1; min-width: 0; }
   .vns-meta-sub { flex-shrink: 0; }
