@@ -55,6 +55,20 @@ def load_audio(path, sr=16000):
     return np.frombuffer(p.stdout, dtype=np.int16).astype("float32") / 32768.0
 
 
+NOISE_RE = re.compile(r"^[\s♪🎵*\[\(（]*(music|音乐|applause|掌声|静音|silence)[\s♪🎵*\]\)）]*$", re.I)
+
+
+def drop_noise(items):
+    """whisper 对纯音乐视频会吐出 "Music" 这类标签，不能当转录用。"""
+    out = []
+    for start, text in items:
+        t = (text or "").strip()
+        if not t or NOISE_RE.match(t):
+            continue
+        out.append([start, t])
+    return out
+
+
 def merge(items, min_chars=24, max_gap=8.0, max_chars=140):
     out = []
     for start, text in items:
@@ -88,21 +102,32 @@ def main():
         from faster_whisper import WhisperModel
         model = WhisperModel(args.model, device="cpu", compute_type="int8")
         lang = args.language or None
-        segments, info = model.transcribe(
-            samples, language=lang, vad_filter=True, beam_size=5,
-            condition_on_previous_text=False,
-        )
-        items = []
-        for seg in segments:
-            text = seg.text.strip()
-            if text:
-                items.append([round(float(seg.start), 2), text])
-        items = merge(items)
+
+        def collect(use_vad):
+            segs, info = model.transcribe(
+                samples, language=lang, vad_filter=use_vad, beam_size=5,
+                condition_on_previous_text=False,
+            )
+            got = []
+            for seg in segs:
+                text = seg.text.strip()
+                if text:
+                    got.append([round(float(seg.start), 2), text])
+            return got, info
+
+        items, info = collect(True)
+        used_vad = True
+        if not items:
+            log("[asr] VAD 过滤后没有语音，关掉 VAD 再试一次")
+            items, info = collect(False)
+            used_vad = False
+        items = merge(drop_noise(items))
         payload = {
             "segments": items,
             "language": getattr(info, "language", ""),
             "duration": round(float(getattr(info, "duration", 0) or 0), 2),
             "count": len(items),
+            "vad": used_vad,
         }
         print(json.dumps(payload, ensure_ascii=False))
         return 0
