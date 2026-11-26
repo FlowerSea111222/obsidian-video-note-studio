@@ -114,17 +114,30 @@ function detectLink(raw) {
   return { kind: "file", id: "", url };
 }
 
-function embedFor(link) {
+function embedFor(link, startAt) {
+  const t = Math.max(0, Math.floor(startAt || 0));
+  const auto = t > 0 ? 1 : 0;
   if (link.kind === "bilibili") {
-    return `https://player.bilibili.com/player.html?bvid=${link.id}&page=${link.page || 1}&high_quality=1&danmaku=0&autoplay=0`;
+    return `https://player.bilibili.com/player.html?bvid=${link.id}&page=${link.page || 1}`
+      + `&high_quality=1&danmaku=0&autoplay=${auto}${t ? `&t=${t}` : ""}`;
   }
   if (link.kind === "youtube") {
-    return `https://www.youtube.com/embed/${link.id}?enablejsapi=1&rel=0`;
+    return `https://www.youtube.com/embed/${link.id}?enablejsapi=1&rel=0`
+      + `${t ? `&start=${t}&autoplay=1` : ""}`;
   }
   if (link.kind === "douyin") {
-    return `https://open.douyin.com/player/video?vid=${link.id}&autoplay=0`;
+    return `https://open.douyin.com/player/video?vid=${link.id}&autoplay=${auto}`;
   }
   return null;
+}
+
+/** 生成能在 Obsidian 内部跳转播放的时间戳链接（走插件注册的 obsidian://vns 协议） */
+function tsLink(link, sec, mode) {
+  const s = Math.max(0, Math.floor(sec || 0));
+  if (mode === "browser") return seekUrl(link, s);
+  const u = encodeURIComponent(link.url || "");
+  const p = link.kind === "bilibili" && link.page > 1 ? `&p=${link.page}` : "";
+  return `obsidian://vns?u=${u}&t=${s}${p}`;
 }
 
 function seekUrl(link, sec) {
@@ -158,6 +171,7 @@ function uniquePath(app, folder, base) {
 const DEFAULT_SETTINGS = {
   inboxFolder: "Clippings",
   playerSplit: "split",
+  timestampMode: "inapp",
   ytDlpPath: "yt-dlp",
   subsLangs: "zh-Hans,zh-CN,zh,en",
   llmBaseUrl: "https://api.deepseek.com/v1",
@@ -248,7 +262,7 @@ class VideoPlayerView extends ItemView {
     hint.innerHTML = "时间戳会插入到<b>当前绑定的笔记</b>；YTB/iframe 播放器读数靠官方 postMessage，读不到时用 <code>手动输入</code>。";
   }
 
-  async load(input) {
+  async load(input, startAt) {
     const raw = String(input || "").trim();
     if (!raw) return;
     this.plugin.recordHabit("player-load");
@@ -256,17 +270,17 @@ class VideoPlayerView extends ItemView {
     link.url = raw;
     if (link.kind === "file") {
       const f = this.app.vault.getAbstractFileByPath(normalizePath(raw));
-      if (f instanceof TFile) return this.loadFile(f);
+      if (f instanceof TFile) return this.loadFile(f, startAt);
       new Notice("找不到这个本地文件，试着用「本地文件」按钮选择");
       return;
     }
     await this.fillMeta(link);
-    this.attach(link);
+    this.attach(link, startAt);
   }
 
-  loadFile(file) {
+  loadFile(file, startAt) {
     const link = { kind: "file", id: file.path, url: file.path, title: file.basename, file };
-    this.attach(link);
+    this.attach(link, startAt);
   }
 
   async fillMeta(link) {
@@ -276,7 +290,7 @@ class VideoPlayerView extends ItemView {
     } catch (e) { /* 元数据拿不到不影响播放 */ }
   }
 
-  attach(link) {
+  attach(link, startAt) {
     this.link = link;
     this.notePath = null;
     this.lastKnownTime = 0;
@@ -292,7 +306,7 @@ class VideoPlayerView extends ItemView {
       this.videoEl.src = this.app.vault.getResourcePath(f);
       this.urlInput.value = f.path;
     } else {
-      const src = embedFor(link);
+      const src = embedFor(link, startAt);
       if (!src) {
         if (link.kind === "direct") {
           this.videoEl = this.stage.createEl("video", { attr: { controls: "true", playsinline: "true" } });
@@ -310,6 +324,26 @@ class VideoPlayerView extends ItemView {
 
     this.timer = setInterval(() => this.tick(), 500);
     this.updateClock();
+  }
+
+  seek(sec) {
+    const s = Math.max(0, Math.floor(sec || 0));
+    if (!this.link) return;
+    this.lastKnownTime = s;
+    if (this.videoEl) {
+      try { this.videoEl.currentTime = s; this.videoEl.play().catch(() => {}); } catch (e) { /* ignore */ }
+      this.updateClock();
+      return;
+    }
+    if (this.iframeEl) {
+      if (this.link.kind === "youtube") {
+        this.iframeEl.contentWindow.postMessage(
+          JSON.stringify({ event: "command", func: "seekTo", args: [s, true] }), "*");
+      } else if (this.link.kind === "bilibili") {
+        // B站 播放器不对外暴露 seek 接口，只能带 t 参数重载
+        this.iframeEl.src = embedFor(this.link, s);
+      }
+    }
   }
 
   tick() {
@@ -338,7 +372,7 @@ class VideoPlayerView extends ItemView {
     if (!this.link) { new Notice("先加载一个视频"); return; }
     const t = await this.plugin.askTime(this.currentTime(), this.videoEl ? this.videoEl.duration : 0);
     if (t === null) return;
-    const url = this.link.kind === "bilibili" || this.link.kind === "youtube" ? seekUrl(this.link, t) : (this.link.url || "");
+    const url = tsLink(this.link, t, this.plugin.settings.timestampMode);
     const line = `- [${fmtTime(t)}](${url}) `;
     await this.plugin.insertIntoActiveNote(line, this.link);
     this.plugin.recordHabit("timestamp");
@@ -380,6 +414,9 @@ class VnsSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("播放器打开方式").setDesc("split 分屏 / tab 新标签页 / window 独立窗口")
       .addDropdown((d) => d.addOption("split", "分屏").addOption("tab", "新标签页").addOption("window", "独立窗口")
         .setValue(s.playerSplit).onChange(async (v) => { s.playerSplit = v; await this.plugin.saveSettings(); }));
+    new Setting(containerEl).setName("时间戳点击行为").setDesc("笔记里的 [0:29] 点下去要做什么")
+      .addDropdown((d) => d.addOption("inapp", "在播放器里跳转播放").addOption("browser", "打开网页定位")
+        .setValue(s.timestampMode || "inapp").onChange(async (v) => { s.timestampMode = v; await this.plugin.saveSettings(); }));
 
     containerEl.createEl("h3", { text: "抓取与转录" });
     text("yt-dlp 路径", "ytDlpPath", "用于取 B站/YouTube 字幕；留空不做转录", "yt-dlp");
@@ -595,6 +632,7 @@ class VideoNoteStudio extends Plugin {
     this.pendingUrl = null;
 
     this.registerView(VIEW_TYPE_PLAYER, (leaf) => new VideoPlayerView(leaf, this));
+    this.registerObsidianProtocolHandler("vns", (params) => this.handleVnsProtocol(params));
     this.addRibbonIcon("play-circle", "打开视频播放器", () => this.openPlayer());
     this.addSettingTab(new VnsSettingTab(this.app, this));
 
@@ -639,6 +677,23 @@ class VideoNoteStudio extends Plugin {
     }
     this.app.workspace.revealLeaf(leaf);
     return leaf;
+  }
+
+  async handleVnsProtocol(params) {
+    const u = (params && params.u) || "";
+    const t = Math.max(0, parseInt((params && params.t) || "0", 10) || 0);
+    if (!u) return;
+    this.recordHabit("jump-timestamp");
+    const leaf = await this.openPlayer();
+    const view = leaf && leaf.view;
+    if (!(view instanceof VideoPlayerView)) return;
+    if (!view.link || view.link.url !== u) {
+      if (view.urlInput) view.urlInput.value = u;
+      await view.load(u, t);
+    } else {
+      view.seek(t);
+    }
+    if (t > 0) new Notice(`已跳转到 ${fmtTime(t)}`, 2000);
   }
 
   pickLocalVideo(cb) { new LocalVideoSuggest(this.app, cb).open(); }
@@ -881,7 +936,7 @@ class VideoNoteStudio extends Plugin {
     body.push("## 时间戳", "");
     if (parts.transcript.length) {
       for (const [t, text] of parts.transcript) {
-        body.push(`- [${fmtTime(t)}](${seekUrl(link, t)}) ${text}`);
+        body.push(`- [${fmtTime(t)}](${tsLink(link, t, this.settings.timestampMode)}) ${text}`);
       }
     } else {
       body.push(parts.article ? "> 网页类链接没有时间轴，可直接在正文里标注。" : "> 没拿到字幕/正文。B站 多数视频没有 CC，需要本地转录或换一个有字幕的视频。");
@@ -1023,7 +1078,7 @@ class VideoNoteStudio extends Plugin {
       new Notice(`补全 ${f.basename}…`, 1500);
       const transcript = await this.fetchTranscript(link);
       if (!transcript.length) continue;
-      const section = ["", "## 时间戳", "", ...transcript.map(([t, s]) => `- [${fmtTime(t)}](${seekUrl(link, t)}) ${s}`), ""].join("\n");
+      const section = ["", "## 时间戳", "", ...transcript.map(([t, s]) => `- [${fmtTime(t)}](${tsLink(link, t, this.settings.timestampMode)}) ${s}`), ""].join("\n");
       await this.app.vault.process(f, (d) => `${d.trimEnd()}\n${section}`);
       done += 1;
     }
