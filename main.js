@@ -183,6 +183,9 @@ const DEFAULT_SETTINGS = {
   llmApiKey: "",
   llmModel: "deepseek-chat",
   visionModel: "",
+  magpieEnabled: false,
+  magpieBaseUrl: "http://127.0.0.1:3425/v1",
+  magpieModel: "auto/deepseek-v4.1-flash",
   autoSummarize: true,
   autoTranslate: false,
   translateTo: "zh",
@@ -512,10 +515,26 @@ class VnsSettingTab extends PluginSettingTab {
       }));
 
     containerEl.createEl("h3", { text: "模型 API" });
-    text("Base URL", "llmBaseUrl", "OpenAI 兼容，例如 https://api.deepseek.com/v1", "https://api.deepseek.com/v1");
-    text("API Key", "llmApiKey", "只存在本机 data.json", "");
-    text("对话模型", "llmModel", "用于摘要/翻译/拆书/Canvas", "deepseek-chat");
-    text("视觉模型", "visionModel", "用于 OCR；留空则 OCR 不可用", "gpt-4o-mini");
+    new Setting(containerEl).setName("使用 magpie 路由").setDesc("直连本机 magpie 网关（OpenAI 兼容），无需 API Key；开启后忽略下方 Base URL / Key / 模型")
+      .addToggle((t) => t.setValue(!!s.magpieEnabled).onChange(async (v) => { s.magpieEnabled = v; await this.plugin.saveSettings(); this.display(); }));
+    if (s.magpieEnabled) {
+      text("magpie 地址", "magpieBaseUrl", "本机 magpie 网关的 OpenAI 兼容入口", "http://127.0.0.1:3425/v1");
+      text("magpie 模型", "magpieModel", "路由组或模型 id，例如 auto/deepseek-v4.1-flash", "auto/deepseek-v4.1-flash");
+      new Setting(containerEl).setName("测试 magpie 连接").setDesc("发一条最小请求，确认网关可用")
+        .addButton((b) => b.setButtonText("测试").onClick(async () => {
+          b.setDisabled(true);
+          try {
+            const reply = await chat(this.plugin.settings, [{ role: "user", content: "只回复两个字：通了" }], { maxTokens: 16 });
+            new Notice(`magpie 可用 → ${reply}`, 8000);
+          } catch (e) { new Notice(`magpie 不可用：${e.message}`, 12000); }
+          finally { b.setDisabled(false); }
+        }));
+    } else {
+      text("Base URL", "llmBaseUrl", "OpenAI 兼容，例如 https://api.deepseek.com/v1", "https://api.deepseek.com/v1");
+      text("API Key", "llmApiKey", "只存在本机 data.json", "");
+      text("对话模型", "llmModel", "用于摘要/翻译/拆书/Canvas", "deepseek-chat");
+      text("视觉模型", "visionModel", "用于 OCR；留空则 OCR 不可用", "gpt-4o-mini");
+    }
     toggle("生成笔记时自动摘要", "autoSummarize");
     toggle("自动翻译为中文", "autoTranslate", "英文视频/文章会追加中文译文");
     text("翻译目标语言", "translateTo", "", "zh");
@@ -541,21 +560,28 @@ class VnsSettingTab extends PluginSettingTab {
 /* ============================ 模型 & yt-dlp ============================ */
 
 async function chat(settings, messages, opts = {}) {
-  if (!settings.llmApiKey) throw new Error("还没配置模型 API Key（设置 → Video Note Studio）");
-  const url = `${String(settings.llmBaseUrl).replace(/\/+$/, "")}/chat/completions`;
+  const useMagpie = !!settings.magpieEnabled;
+  if (!useMagpie && !settings.llmApiKey) {
+    throw new Error("还没配置模型 API Key（设置 → Video Note Studio；或开启「使用 magpie 路由」）");
+  }
+  const base = useMagpie
+    ? (settings.magpieBaseUrl || "http://127.0.0.1:3425/v1")
+    : settings.llmBaseUrl;
+  const model = useMagpie
+    ? (opts.model || settings.magpieModel || "auto/deepseek-v4.1-flash")
+    : (opts.model || settings.llmModel);
+  const headers = { "Content-Type": "application/json" };
+  if (!useMagpie && settings.llmApiKey) headers.Authorization = `Bearer ${settings.llmApiKey}`;
+
+  const url = `${String(base).replace(/\/+$/, "")}/chat/completions`;
   const res = await requestUrl({
-    url,
-    method: "POST",
-    throw: false,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${settings.llmApiKey}` },
-    body: JSON.stringify({
-      model: opts.model || settings.llmModel,
-      messages,
-      temperature: opts.temperature ?? 0.3,
-      max_tokens: opts.maxTokens || 2048,
-    }),
+    url, method: "POST", throw: false, headers,
+    body: JSON.stringify({ model, messages, temperature: opts.temperature ?? 0.3, max_tokens: opts.maxTokens || 2048 }),
   });
-  if (res.status >= 400) throw new Error(`模型接口 ${res.status}: ${String(res.text || "").slice(0, 200)}`);
+  if (res.status >= 400) {
+    const hint = useMagpie ? "（magpie 路由不可达？检查本地 magpie 服务是否在运行）" : "";
+    throw new Error(`模型接口 ${res.status}${hint}: ${String(res.text || "").slice(0, 200)}`);
+  }
   const data = res.json || JSON.parse(res.text || "{}");
   const msg = data.choices && data.choices[0] && data.choices[0].message;
   return (msg && msg.content ? msg.content : "").trim();
@@ -898,6 +924,8 @@ class VideoNoteStudio extends Plugin {
   }
 
   /* ---------- 元数据 / 转录 ---------- */
+  hasLlm() { return !!(this.settings.magpieEnabled || this.settings.llmApiKey); }
+
   async requestJson(url, headers) {
     const res = await requestUrl({ url, method: "GET", throw: false, headers: headers || {} });
     if (res.status >= 400) throw new Error(`HTTP ${res.status}`);
@@ -1102,7 +1130,7 @@ class VideoNoteStudio extends Plugin {
     const bodyText = transcript.length ? transcript.map((x) => x[1]).join("\n") : article;
 
     let summary = "";
-    if (this.settings.autoSummarize && this.settings.llmApiKey && bodyText) {
+    if (this.settings.autoSummarize && this.hasLlm() && bodyText) {
       try { summary = await this.summarize(meta, bodyText); } catch (e) { summary = `> 摘要生成失败：${e.message}`; }
     }
 
@@ -1168,7 +1196,7 @@ class VideoNoteStudio extends Plugin {
     if (parts.summary) {
       body.push(parts.summary.trim(), "");
     } else if (parts.transcript.length) {
-      body.push("> [!note] 没配模型 API Key，所以没有自动摘要；下面是逐句转录。", "");
+      body.push("> [!note] 没配模型（API Key 或 magpie 路由），所以没有自动摘要；下面是逐句转录。", "");
     }
     if (parts.article) {
       body.push("## 正文", "", parts.article.trim().slice(0, 12000), "");
@@ -1185,7 +1213,7 @@ class VideoNoteStudio extends Plugin {
       if (this.settings.lastAsrError) {
         body.push(`  - 具体报错：\`${String(this.settings.lastAsrError).slice(0, 300)}\``);
       }
-      body.push("- **AI 摘要**：需要填模型 API Key 才会生成。");
+      body.push("- **AI 摘要**：需要填模型 API Key，或在设置里开启「使用 magpie 路由」。");
       body.push("");
       body.push(meta.description ? "简介已写在上面，其余只有链接与元数据。" : "只能记录链接与元数据。");
     }
@@ -1228,7 +1256,7 @@ class VideoNoteStudio extends Plugin {
   }
 
   async distillBook(file) {
-    if (!this.settings.llmApiKey) throw new Error("拆书需要模型 API Key");
+    if (!this.hasLlm()) throw new Error("拆书需要模型 API Key 或开启 magpie 路由");
     new Notice(`读取《${file.basename}》…`);
     let chapters = [];
     if ((file.extension || "").toLowerCase() === "epub") {
