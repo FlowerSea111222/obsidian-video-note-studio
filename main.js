@@ -2531,14 +2531,14 @@ class VideoPlayerView extends ItemView {
   getIcon() { return "play-circle"; }
 
   async onOpen() {
-    window.addEventListener("message", this.onMessage);
+    this.registerDomEvent(window, "message", this.onMessage);
     this.render();
     const pending = this.plugin.pendingUrl;
     if (pending) { this.plugin.pendingUrl = null; await this.load(pending); }
   }
 
   async onClose() {
-    window.removeEventListener("message", this.onMessage);
+    // registerDomEvent 注册的监听随组件销毁自动清理，这里只需停掉计时器
     if (this.timer) clearInterval(this.timer);
   }
 
@@ -3272,7 +3272,10 @@ class VideoNoteStudio extends Plugin {
     this.registerEvent(this.app.vault.on("rename", (f, old) => this.reindexFile(f, old)));
   }
 
-  onunload() { this.app.workspace.detachLeavesOfType(VIEW_TYPE_PLAYER); }
+  onunload() {
+    // 官方指南：不要在 onunload 里 detachLeavesOfType——用户更新插件时 leaf 会被原地重建
+    if (this._habitTimer) clearTimeout(this._habitTimer);
+  }
 
   resolveBridgePath() {
     try {
@@ -3292,10 +3295,10 @@ class VideoNoteStudio extends Plugin {
       for (const c of candidates) {
         try { if (fs.existsSync(c)) return c; } catch (e) { /* ignore */ }
       }
-      console.warn("[vns] 没找到 asr_bridge.py，候选路径：", candidates);
+      console.debug("[vns] 没找到 asr_bridge.py，候选路径：", candidates);
       return candidates[0] || "";
     } catch (e) {
-      console.warn("[vns] 解析 bridge 路径失败", e);
+      console.debug("[vns] 解析 bridge 路径失败", e);
       return "";
     }
   }
@@ -3455,7 +3458,7 @@ class VideoNoteStudio extends Plugin {
       }
       return true;
     } catch (e) {
-      console.warn("[vns] 写入 B站 Cookie 失败", e);
+      console.debug("[vns] 写入 B站 Cookie 失败", e);
       return false;
     }
   }
@@ -3469,7 +3472,7 @@ class VideoNoteStudio extends Plugin {
         await this.saveSettings();
         return this.settings.biliUser;
       }
-    } catch (e) { console.warn("[vns] 获取 B站用户失败", e); }
+    } catch (e) { console.debug("[vns] 获取 B站用户失败", e); }
     return null;
   }
 
@@ -3572,7 +3575,7 @@ class VideoNoteStudio extends Plugin {
       const raw = fs.readFileSync(pathApi.join(tmp, files[0]), "utf8");
       return mergeLines(parseVtt(raw));
     } catch (e) {
-      console.warn("[vns] 字幕获取失败", e.message);
+      console.debug("[vns] 字幕获取失败", e.message);
       return [];
     } finally {
       try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* ignore */ }
@@ -3616,7 +3619,7 @@ class VideoNoteStudio extends Plugin {
         return segs;
       } catch (e) {
         lastErr = `${bin} → ${e.message}`;
-        console.warn("[vns] 本地转录尝试失败", lastErr);
+        console.debug("[vns] 本地转录尝试失败", lastErr);
         if (!/ENOENT|not found|不是内部或外部命令/i.test(e.message)) break;
       }
     }
@@ -3713,7 +3716,7 @@ class VideoNoteStudio extends Plugin {
       try {
         const canvasPath = await this.makeCanvas(meta.title, md, this.settings.canvasFolder);
         await this.linkCanvasInNote(file, canvasPath);
-      } catch (e) { console.warn(e); new Notice(`Canvas 生成失败：${e.message}`, 6000); }
+      } catch (e) { console.debug(e); new Notice(`Canvas 生成失败：${e.message}`, 6000); }
     }
     new Notice(`已生成笔记：${path}`, 6000);
     return file;
@@ -3933,7 +3936,7 @@ class VideoNoteStudio extends Plugin {
         if (/bilibili\.com|youtube\.com|youtu\.be|douyin\.com/.test(url)) this.noteIndex.set(url, f.path);
       } catch (e) { /* ignore */ }
     }
-    console.log(`[vns] 索引到 ${this.noteIndex.size} 篇视频笔记`);
+    console.debug(`[vns] 索引到 ${this.noteIndex.size} 篇视频笔记`);
   }
 
   reindexFile() { /* 重命名后索引会在下次启动重建，这里保持轻量 */ }
