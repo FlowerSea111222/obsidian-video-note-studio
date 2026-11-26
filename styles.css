@@ -1,0 +1,28 @@
+/* Video Note Studio — 播放器与笔记面板样式 */
+.vns-root { display: flex; flex-direction: column; height: 100%; background: var(--background-primary); }
+
+.vns-toolbar {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 8px 10px; border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+.vns-url { flex: 1 1 240px; min-width: 160px; padding: 4px 8px; font-size: 13px; }
+.vns-btn {
+  padding: 3px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
+  background: var(--interactive-normal); color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+}
+.vns-btn:hover { background: var(--interactive-hover); }
+.vns-btn.is-accent { background: var(--interactive-accent); color: var(--text-on-accent); border-color: transparent; }
+.vns-btn.is-warn { color: var(--text-error); }
+.vns-time { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text-muted); min-width: 92px; }
+
+.vns-stage { flex: 1 1 auto; position: relative; overflow: hidden; background: #000; }
+.vns-stage video, .vns-stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.vns-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 13px; }
+
+.vns-hint { padding: 6px 10px; font-size: 11px; color: var(--text-muted); border-top: 1px solid var(--background-modifier-border); }
+.vns-hint code { background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }
+
+/* 设置页 */
+.vns-setting-note { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
