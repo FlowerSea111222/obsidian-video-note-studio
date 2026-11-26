@@ -82,6 +82,9 @@
   display: flex; align-items: center; gap: 12px;
   min-height: 28px;
 }
+.vns-action-row .vns-btn-group {
+  flex-wrap: wrap; justify-content: flex-end;
+}
 
 /* 元信息 */
 .vns-meta {
