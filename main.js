@@ -260,6 +260,7 @@ class VideoPlayerView extends ItemView {
       b.addEventListener("click", fn);
       return b;
     };
+    btn(btnGroup, "清除", () => this.clearAll(), "is-ghost");
     btn(btnGroup, "加载", () => this.load(this.urlInput.value), "is-accent");
     btn(btnGroup, "本地", () => this.plugin.pickLocalVideo((f) => this.loadFile(f)));
 
@@ -301,6 +302,28 @@ class VideoPlayerView extends ItemView {
 
   setStatus(text) {
     if (this.statusEl) this.statusEl.setText(text || "");
+  }
+
+  clearAll() {
+    // 停掉正在播放的视频 / iframe
+    if (this.videoEl) {
+      try { this.videoEl.pause(); this.videoEl.removeAttribute("src"); this.videoEl.load(); } catch (e) { /* ignore */ }
+      this.videoEl = null;
+    }
+    if (this.iframeEl) { this.iframeEl.src = "about:blank"; this.iframeEl = null; }
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+
+    // 重置状态
+    this.link = null;
+    this.notePath = null;
+    this.lastKnownTime = 0;
+
+    // 清空 UI
+    if (this.urlInput) this.urlInput.value = "";
+    if (this.stage) { this.stage.empty(); this.stage.createDiv({ cls: "vns-empty", text: "粘贴链接或选择本地视频开始" }); }
+    this.updateMeta(null);
+    this.updateClock();
+    this.setStatus("已清除");
   }
 
   async load(input, startAt) {
