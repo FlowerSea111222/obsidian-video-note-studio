@@ -177,6 +177,7 @@ const DEFAULT_SETTINGS = {
   pythonPath: "python",
   asrModel: "small",
   asrLanguage: "",
+  lastAsrError: "",
   subsLangs: "zh-Hans,zh-CN,zh,en",
   llmBaseUrl: "https://api.deepseek.com/v1",
   llmApiKey: "",
@@ -429,6 +430,11 @@ class VnsSettingTab extends PluginSettingTab {
     text("Python 路径", "pythonPath", "调用 asr_bridge.py 的解释器", "python");
     text("Whisper 模型", "asrModel", "tiny / base / small / medium，越大越准越慢", "small");
     text("转录语言", "asrLanguage", "留空自动检测，或填 zh / en", "");
+    new Setting(containerEl).setName("测试本地转录").setDesc("检查 Python、faster-whisper 与 asr_bridge.py 是否就位")
+      .addButton((b) => b.setButtonText("运行测试").onClick(async () => {
+        b.setDisabled(true);
+        try { new Notice(await this.plugin.testBridge(), 12000); } finally { b.setDisabled(false); }
+      }));
 
     containerEl.createEl("h3", { text: "模型 API" });
     text("Base URL", "llmBaseUrl", "OpenAI 兼容，例如 https://api.deepseek.com/v1", "https://api.deepseek.com/v1");
@@ -649,10 +655,7 @@ class VideoNoteStudio extends Plugin {
 
     this.registerView(VIEW_TYPE_PLAYER, (leaf) => new VideoPlayerView(leaf, this));
     this.registerObsidianProtocolHandler("vns", (params) => this.handleVnsProtocol(params));
-    try {
-      const nodePath = require("path");
-      this.bridgePath = nodePath.join((this.manifest && this.manifest.dir) || "", "asr_bridge.py");
-    } catch (e) { this.bridgePath = ""; }
+    this.bridgePath = this.resolveBridgePath();
     this.addRibbonIcon("play-circle", "打开视频播放器", () => this.openPlayer());
     this.addSettingTab(new VnsSettingTab(this.app, this));
 
@@ -679,6 +682,54 @@ class VideoNoteStudio extends Plugin {
 
   onunload() { this.app.workspace.detachLeavesOfType(VIEW_TYPE_PLAYER); }
 
+  resolveBridgePath() {
+    try {
+      const nodePath = require("path");
+      const fs = require("fs");
+      const adapter = this.app.vault.adapter;
+      const base = adapter && typeof adapter.getBasePath === "function" ? adapter.getBasePath() : null;
+      const cfg = this.app.vault.configDir || ".obsidian";
+      const candidates = [];
+      if (base) candidates.push(nodePath.join(base, cfg, "plugins", this.manifest.id, "asr_bridge.py"));
+      if (this.manifest.dir) {
+        if (base && !nodePath.isAbsolute(this.manifest.dir)) {
+          candidates.push(nodePath.join(base, this.manifest.dir, "asr_bridge.py"));
+        }
+        candidates.push(nodePath.resolve(this.manifest.dir, "asr_bridge.py"));
+      }
+      for (const c of candidates) {
+        try { if (fs.existsSync(c)) return c; } catch (e) { /* ignore */ }
+      }
+      console.warn("[vns] 没找到 asr_bridge.py，候选路径：", candidates);
+      return candidates[0] || "";
+    } catch (e) {
+      console.warn("[vns] 解析 bridge 路径失败", e);
+      return "";
+    }
+  }
+
+  pythonCandidates() {
+    const list = [this.settings.pythonPath, "python", "python3", "py"];
+    try {
+      const fs = require("fs");
+      const nodePath = require("path");
+      const roots = [
+        process.env.LOCALAPPDATA && nodePath.join(process.env.LOCALAPPDATA, "Programs", "Python"),
+        "C:\\Python312",
+        "C:\\Python311",
+        "C:\\Program Files\\Python312",
+      ].filter(Boolean);
+      for (const root of roots) {
+        if (!fs.existsSync(root)) continue;
+        for (const d of fs.readdirSync(root)) {
+          const exe = nodePath.join(root, d, "python.exe");
+          try { if (fs.existsSync(exe)) list.push(exe); } catch (e) { /* ignore */ }
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return [...new Set(list.filter(Boolean))];
+  }
+
   async loadSettings() { this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); }
   async saveSettings() { await this.saveData(this.settings); }
 
@@ -697,6 +748,25 @@ class VideoNoteStudio extends Plugin {
     }
     this.app.workspace.revealLeaf(leaf);
     return leaf;
+  }
+
+  async testBridge() {
+    if (!cp) return "当前环境起不了外部进程（仅桌面版）";
+    const fs = require("fs");
+    const nodePath = require("path");
+    const script = this.bridgePath;
+    if (!script || !fs.existsSync(script)) return `找不到 asr_bridge.py：${script || "(空)"}`;
+    for (const bin of this.pythonCandidates()) {
+      try {
+        const out = await runProcess(bin,
+          ["-c", "import sys,faster_whisper;print('ok python',sys.version.split()[0],'faster-whisper',faster_whisper.__version__)"],
+          nodePath.dirname(script), 60000);
+        return `${bin} 可用 → ${out.trim()}`;
+      } catch (e) {
+        if (!/ENOENT|not found|不是内部或外部命令/i.test(e.message)) return `${bin} 不可用 → ${e.message}`;
+      }
+    }
+    return "找不到可用的 Python，请把「Python 路径」填成 python.exe 的完整路径";
   }
 
   async handleVnsProtocol(params) {
@@ -842,30 +912,44 @@ class VideoNoteStudio extends Plugin {
   }
 
   async localTranscript(link) {
-    if (!cp || !this.settings.asrEnabled) return [];
+    if (!cp || !this.settings.asrEnabled) {
+      this.settings.lastAsrError = "本地转录开关没打开";
+      return [];
+    }
     const fs = require("fs");
     const nodePath = require("path");
     const script = this.bridgePath;
     if (!script || !fs.existsSync(script)) {
-      console.warn("[vns] 找不到 asr_bridge.py:", script);
+      this.settings.lastAsrError = `找不到 asr_bridge.py（manifest.dir=${this.manifest.dir || "?"}）`;
+      console.warn("[vns]", this.settings.lastAsrError);
+      await this.saveSettings();
       return [];
     }
-    try {
-      const out = await runProcess(this.settings.pythonPath || "python", [
-        script, "--url", link.url,
-        "--model", this.settings.asrModel || "small",
-        "--language", this.settings.asrLanguage || "",
-        "--ytdlp", this.settings.ytDlpPath || "yt-dlp",
-      ], nodePath.dirname(script), 30 * 60 * 1000);
-      const line = String(out).trim().split(/\r?\n/).filter(Boolean).pop() || "{}";
-      const parsed = JSON.parse(line);
-      if (parsed.error) throw new Error(parsed.error);
-      return (parsed.segments || []).map((x) => [Number(x[0]), String(x[1])]);
-    } catch (e) {
-      console.warn("[vns] 本地转录失败", e.message);
-      new Notice(`本地转录失败：${e.message}`, 8000);
-      return [];
+    let lastErr = "";
+    for (const bin of this.pythonCandidates()) {
+      try {
+        const out = await runProcess(bin, [
+          script, "--url", link.url,
+          "--model", this.settings.asrModel || "small",
+          "--language", this.settings.asrLanguage || "",
+          "--ytdlp", this.settings.ytDlpPath || "yt-dlp",
+        ], nodePath.dirname(script), 30 * 60 * 1000);
+        const line = String(out).trim().split(/\r?\n/).filter(Boolean).pop() || "{}";
+        const parsed = JSON.parse(line);
+        if (parsed.error) throw new Error(parsed.error);
+        this.settings.lastAsrError = "";
+        await this.saveSettings();
+        return (parsed.segments || []).map((x) => [Number(x[0]), String(x[1])]);
+      } catch (e) {
+        lastErr = `${bin} → ${e.message}`;
+        console.warn("[vns] 本地转录尝试失败", lastErr);
+        if (!/ENOENT|not found|不是内部或外部命令/i.test(e.message)) break;
+      }
     }
+    this.settings.lastAsrError = lastErr;
+    await this.saveSettings();
+    new Notice(`本地转录失败：${lastErr}`, 10000);
+    return [];
   }
 
   /* ---------- 模型能力 ---------- */
@@ -994,6 +1078,9 @@ class VideoNoteStudio extends Plugin {
     if (meta.description) {
       body.push("## 简介", "", meta.description.trim().slice(0, 2000), "");
     }
+    if (meta.tagList && meta.tagList.length) {
+      body.push("## 标签", "", meta.tagList.map((t) => `\`${t}\``).join(" "), "");
+    }
     if (meta.pages && meta.pages.length) {
       body.push("## 分P", "", ...meta.pages.map((p) => `- ${p}`), "");
     }
@@ -1013,7 +1100,10 @@ class VideoNoteStudio extends Plugin {
     } else {
       body.push("> [!warning] 这篇笔记没能拿到正文，原因逐条列在下面：", "");
       body.push("- **平台字幕**：没有。B站 多数视频只提供弹幕流，没有 CC / AI 字幕，yt-dlp 抓不到文本。");
-      body.push(`- **本地转录**：${this.settings.asrEnabled ? "已开启但失败——检查「设置 → 本地转录」里的 Python 路径，以及插件目录下是否有 asr_bridge.py" : "未开启——去「设置 → 本地转录」打开它"}。`);
+      body.push(`- **本地转录**：${this.settings.asrEnabled ? "已开启但失败" : "未开启——去「设置 → 本地转录」打开它"}。`);
+      if (this.settings.lastAsrError) {
+        body.push(`  - 具体报错：\`${String(this.settings.lastAsrError).slice(0, 300)}\``);
+      }
       body.push("- **AI 摘要**：需要填模型 API Key 才会生成。");
       body.push("");
       body.push(meta.description ? "简介已写在上面，其余只有链接与元数据。" : "只能记录链接与元数据。");
