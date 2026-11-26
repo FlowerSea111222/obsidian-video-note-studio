@@ -1,28 +1,154 @@
-/* Video Note Studio — 播放器与笔记面板样式 */
-.vns-root { display: flex; flex-direction: column; height: 100%; background: var(--background-primary); }
+/* Video Note Studio — 播放器 UI */
+/* 风格：Linear × Apple — 高信息密度、柔光边缘、克制的色彩 */
 
+/* ── 根布局 ── */
+.vns-root {
+  display: flex; flex-direction: column; height: 100%;
+  background: var(--background-primary);
+  font-family: var(--font-interface);
+}
+
+/* ── 顶部工具栏 ── */
 .vns-toolbar {
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-  padding: 8px 10px; border-bottom: 1px solid var(--background-modifier-border);
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 16px;
   background: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
 }
-.vns-url { flex: 1 1 240px; min-width: 160px; padding: 4px 8px; font-size: 13px; }
-.vns-btn {
-  padding: 3px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
-  background: var(--interactive-normal); color: var(--text-normal);
+
+/* 输入行 */
+.vns-input-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.vns-url {
+  flex: 1; min-width: 0;
+  padding: 6px 10px;
+  font-size: 13px; line-height: 1.5;
+  background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--text-normal);
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
-.vns-btn:hover { background: var(--interactive-hover); }
-.vns-btn.is-accent { background: var(--interactive-accent); color: var(--text-on-accent); border-color: transparent; }
-.vns-btn.is-warn { color: var(--text-error); }
-.vns-time { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text-muted); min-width: 92px; }
+.vns-url:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 25%, transparent);
+}
+.vns-url::placeholder { color: var(--text-faint); }
 
-.vns-stage { flex: 1 1 auto; position: relative; overflow: hidden; background: #000; }
-.vns-stage video, .vns-stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.vns-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 13px; }
+/* 按钮组 */
+.vns-btn-group {
+  display: flex; gap: 6px; flex-shrink: 0;
+}
+.vns-btn {
+  padding: 5px 14px;
+  font-size: 12px; font-weight: 500; line-height: 1.6;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: background 120ms ease, box-shadow 120ms ease;
+  white-space: nowrap;
+}
+.vns-btn:hover {
+  background: var(--interactive-hover);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.vns-btn:active {
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.04);
+  transform: translateY(0.5px);
+}
+.vns-btn.is-accent {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: transparent;
+}
+.vns-btn.is-accent:hover {
+  background: var(--interactive-accent-hover);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+}
+.vns-btn.is-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: transparent;
+}
+.vns-btn.is-ghost:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
 
-.vns-hint { padding: 6px 10px; font-size: 11px; color: var(--text-muted); border-top: 1px solid var(--background-modifier-border); }
-.vns-hint code { background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }
+/* 操作行（元信息 + 按钮） */
+.vns-action-row {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 28px;
+}
 
-/* 设置页 */
-.vns-setting-note { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+/* 元信息 */
+.vns-meta {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.vns-meta-placeholder {
+  font-size: 12px; color: var(--text-faint); font-style: italic;
+}
+.vns-meta-title {
+  font-size: 13px; font-weight: 600; color: var(--text-normal);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vns-meta-sub {
+  font-size: 11px; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── 播放器舞台 ── */
+.vns-stage {
+  flex: 1 1 auto; position: relative; overflow: hidden;
+  background: #000;
+  border-radius: 0;
+}
+.vns-stage video, .vns-stage iframe {
+  position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
+}
+.vns-empty {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%;
+  color: var(--text-faint); font-size: 13px;
+  background: var(--background-primary);
+}
+
+/* ── 底部状态栏 ── */
+.vns-statusbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 16px;
+  background: var(--background-secondary);
+  border-top: 1px solid var(--background-modifier-border);
+  font-size: 12px;
+}
+.vns-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+.vns-status {
+  font-size: 11px; color: var(--text-faint);
+}
+
+/* ── 设置页 ── */
+.vns-setting-note {
+  font-size: 12px; color: var(--text-muted); margin-top: 4px;
+}
+
+/* ── 响应式：窄窗 ── */
+@media (max-width: 600px) {
+  .vns-input-row { flex-direction: column; align-items: stretch; }
+  .vns-btn-group { justify-content: flex-end; }
+  .vns-action-row { flex-direction: column; align-items: stretch; gap: 6px; }
+  .vns-meta { flex-direction: row; gap: 8px; align-items: center; }
+  .vns-meta-title { flex: 1; min-width: 0; }
+  .vns-meta-sub { flex-shrink: 0; }
+  .vns-toolbar { padding: 10px 12px; }
+  .vns-statusbar { padding: 5px 12px; }
+}
