@@ -173,6 +173,10 @@ const DEFAULT_SETTINGS = {
   playerSplit: "split",
   timestampMode: "inapp",
   ytDlpPath: "yt-dlp",
+  asrEnabled: true,
+  pythonPath: "python",
+  asrModel: "small",
+  asrLanguage: "",
   subsLangs: "zh-Hans,zh-CN,zh,en",
   llmBaseUrl: "https://api.deepseek.com/v1",
   llmApiKey: "",
@@ -421,6 +425,10 @@ class VnsSettingTab extends PluginSettingTab {
     containerEl.createEl("h3", { text: "抓取与转录" });
     text("yt-dlp 路径", "ytDlpPath", "用于取 B站/YouTube 字幕；留空不做转录", "yt-dlp");
     text("优先字幕语言", "subsLangs", "逗号分隔，按顺序尝试", "zh-Hans,zh-CN,zh,en");
+    toggle("没有字幕时用本地 Whisper 转录", "asrEnabled", "调用插件自带的 asr_bridge.py，需要本机已装 Python + faster-whisper");
+    text("Python 路径", "pythonPath", "调用 asr_bridge.py 的解释器", "python");
+    text("Whisper 模型", "asrModel", "tiny / base / small / medium，越大越准越慢", "small");
+    text("转录语言", "asrLanguage", "留空自动检测，或填 zh / en", "");
 
     containerEl.createEl("h3", { text: "模型 API" });
     text("Base URL", "llmBaseUrl", "OpenAI 兼容，例如 https://api.deepseek.com/v1", "https://api.deepseek.com/v1");
@@ -472,16 +480,24 @@ async function chat(settings, messages, opts = {}) {
   return (msg && msg.content ? msg.content : "").trim();
 }
 
-function runProcess(bin, args, cwd) {
+function runProcess(bin, args, cwd, timeoutMs) {
   return new Promise((resolve, reject) => {
     if (!cp) return reject(new Error("当前环境不能启动外部进程（仅桌面版支持）"));
     let out = "";
     let err = "";
+    let timer = null;
     const p = cp.spawn(bin, args, { cwd, windowsHide: true });
+    if (timeoutMs) {
+      timer = setTimeout(() => {
+        try { p.kill(); } catch (e) { /* ignore */ }
+        reject(new Error(`外部进程超时（${Math.round(timeoutMs / 1000)}s）`));
+      }, timeoutMs);
+    }
     p.stdout.on("data", (d) => { out += d.toString("utf8"); });
     p.stderr.on("data", (d) => { err += d.toString("utf8"); });
-    p.on("error", (e) => reject(new Error(`无法运行 ${bin}：${e.message}`)));
+    p.on("error", (e) => { if (timer) clearTimeout(timer); reject(new Error(`无法运行 ${bin}：${e.message}`)); });
     p.on("close", (code) => {
+      if (timer) clearTimeout(timer);
       if (code === 0) resolve(out);
       else reject(new Error((err || `退出码 ${code}`).trim().slice(-800)));
     });
@@ -633,6 +649,10 @@ class VideoNoteStudio extends Plugin {
 
     this.registerView(VIEW_TYPE_PLAYER, (leaf) => new VideoPlayerView(leaf, this));
     this.registerObsidianProtocolHandler("vns", (params) => this.handleVnsProtocol(params));
+    try {
+      const nodePath = require("path");
+      this.bridgePath = nodePath.join((this.manifest && this.manifest.dir) || "", "asr_bridge.py");
+    } catch (e) { this.bridgePath = ""; }
     this.addRibbonIcon("play-circle", "打开视频播放器", () => this.openPlayer());
     this.addSettingTab(new VnsSettingTab(this.app, this));
 
@@ -762,6 +782,13 @@ class VideoNoteStudio extends Plugin {
         if (link.page > 1 && d.pages && d.pages[link.page - 1]) {
           meta.extra = d.pages[link.page - 1].part || "";
         }
+        if (d.pages && d.pages.length > 1) {
+          meta.pages = d.pages.map((p, i) => `${i + 1}. ${p.part || `P${i + 1}`}`);
+        }
+        if (d.stat) {
+          meta.stats = `播放 ${d.stat.view || 0} ｜ 点赞 ${d.stat.like || 0} ｜ 弹幕 ${d.stat.danmaku || 0}`;
+        }
+        if (Array.isArray(d.tags) && d.tags.length) meta.tagList = d.tags;
         return meta;
       }
       if (link.kind === "youtube") {
@@ -811,6 +838,33 @@ class VideoNoteStudio extends Plugin {
       return [];
     } finally {
       try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+    }
+  }
+
+  async localTranscript(link) {
+    if (!cp || !this.settings.asrEnabled) return [];
+    const fs = require("fs");
+    const nodePath = require("path");
+    const script = this.bridgePath;
+    if (!script || !fs.existsSync(script)) {
+      console.warn("[vns] 找不到 asr_bridge.py:", script);
+      return [];
+    }
+    try {
+      const out = await runProcess(this.settings.pythonPath || "python", [
+        script, "--url", link.url,
+        "--model", this.settings.asrModel || "small",
+        "--language", this.settings.asrLanguage || "",
+        "--ytdlp", this.settings.ytDlpPath || "yt-dlp",
+      ], nodePath.dirname(script), 30 * 60 * 1000);
+      const line = String(out).trim().split(/\r?\n/).filter(Boolean).pop() || "{}";
+      const parsed = JSON.parse(line);
+      if (parsed.error) throw new Error(parsed.error);
+      return (parsed.segments || []).map((x) => [Number(x[0]), String(x[1])]);
+    } catch (e) {
+      console.warn("[vns] 本地转录失败", e.message);
+      new Notice(`本地转录失败：${e.message}`, 8000);
+      return [];
     }
   }
 
@@ -871,6 +925,10 @@ class VideoNoteStudio extends Plugin {
     let transcript = [];
     if (["bilibili", "youtube", "douyin", "direct"].includes(link.kind)) {
       transcript = await this.fetchTranscript(link);
+      if (!transcript.length && this.settings.asrEnabled) {
+        new Notice("没有平台字幕，改用本地 Whisper 转录（可能要 1-3 分钟）…", 6000);
+        transcript = await this.localTranscript(link);
+      }
     }
     let article = "";
     if (meta.html && ["weixin", "web", "netdisk", "douyin"].includes(link.kind)) {
@@ -926,10 +984,24 @@ class VideoNoteStudio extends Plugin {
     body.push(`> \`${link.url}\``);
     body.push("");
 
-    if (meta.description && parts.article.length < 200) {
-      body.push("## 简介", "", meta.description.trim(), "");
+    const metaLine = [];
+    if (meta.author) metaLine.push(`**作者**：${meta.author}`);
+    if (meta.duration) metaLine.push(`**时长**：${fmtTime(meta.duration)}`);
+    if (meta.stats) metaLine.push(meta.stats);
+    if (meta.extra) metaLine.push(meta.extra);
+    if (metaLine.length) body.push(metaLine.join(" ｜ "), "");
+
+    if (meta.description) {
+      body.push("## 简介", "", meta.description.trim().slice(0, 2000), "");
     }
-    if (parts.summary) body.push(parts.summary.trim(), "");
+    if (meta.pages && meta.pages.length) {
+      body.push("## 分P", "", ...meta.pages.map((p) => `- ${p}`), "");
+    }
+    if (parts.summary) {
+      body.push(parts.summary.trim(), "");
+    } else if (parts.transcript.length) {
+      body.push("> [!note] 没配模型 API Key，所以没有自动摘要；下面是逐句转录。", "");
+    }
     if (parts.article) {
       body.push("## 正文", "", parts.article.trim().slice(0, 12000), "");
     }
@@ -939,7 +1011,12 @@ class VideoNoteStudio extends Plugin {
         body.push(`- [${fmtTime(t)}](${tsLink(link, t, this.settings.timestampMode)}) ${text}`);
       }
     } else {
-      body.push(parts.article ? "> 网页类链接没有时间轴，可直接在正文里标注。" : "> 没拿到字幕/正文。B站 多数视频没有 CC，需要本地转录或换一个有字幕的视频。");
+      body.push("> [!warning] 这篇笔记没能拿到正文，原因逐条列在下面：", "");
+      body.push("- **平台字幕**：没有。B站 多数视频只提供弹幕流，没有 CC / AI 字幕，yt-dlp 抓不到文本。");
+      body.push(`- **本地转录**：${this.settings.asrEnabled ? "已开启但失败——检查「设置 → 本地转录」里的 Python 路径，以及插件目录下是否有 asr_bridge.py" : "未开启——去「设置 → 本地转录」打开它"}。`);
+      body.push("- **AI 摘要**：需要填模型 API Key 才会生成。");
+      body.push("");
+      body.push(meta.description ? "简介已写在上面，其余只有链接与元数据。" : "只能记录链接与元数据。");
     }
     body.push("", "## 原文", "", link.url, "");
     return fm.join("\n") + body.join("\n");
