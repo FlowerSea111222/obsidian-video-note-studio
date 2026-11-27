@@ -3199,23 +3199,74 @@ class BiliLoginModal extends Modal {
     this.poll(status).catch((e) => this.showError(e));
   }
 
+  /** 从任意 URL 里抽取 B站 登录 Cookie（兼容三种返回形态） */
+  parseBiliCookies(rawUrl, setCookieHeaders) {
+    const cookies = {};
+    const names = ["SESSDATA", "bili_jct", "DedeUserID", "DedeUserID__ckMd5", "sid"];
+    // 形态 1：登录成功时 data.url 形如 https://.../?SESSDATA=xxx&DedeUserID=yyy&...
+    try {
+      const u = new URL(String(rawUrl || ""));
+      for (const name of names) {
+        const v = u.searchParams.get(name);
+        if (v) cookies[name] = v;
+      }
+      // 有些版本把 Cookie 放在 hash 片段里：#SESSDATA=...
+      const hash = (u.hash || "").replace(/^#/, "");
+      if (hash.includes("SESSDATA")) {
+        for (const pair of hash.split("&")) {
+          const [k, v] = pair.split("=");
+          if (k && names.includes(decodeURIComponent(k)) && v) cookies[decodeURIComponent(k)] = decodeURIComponent(v);
+        }
+      }
+    } catch (e) { /* url 可能为空 */ }
+    // 形态 2：Set-Cookie 响应头
+    for (const line of setCookieHeaders || []) {
+      const first = String(line).split(";")[0];
+      const eq = first.indexOf("=");
+      if (eq <= 0) continue;
+      const k = first.slice(0, eq).trim();
+      const v = first.slice(eq + 1);
+      if (names.includes(k) && v) cookies[k] = v;
+    }
+    // 形态 3：rawUrl 本身是 cookieless 的登录态（data.url 为空但 refresh_token 存在）时无法补 SESSDATA
+    return cookies;
+  }
+
   async poll(statusEl) {
     if (this.cancelled) return;
-    const data = await this.plugin.requestJson(
-      `https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key=${encodeURIComponent(this.qrcodeKey)}`,
-      this.plugin.biliHeaders(),
-    );
+    const pollUrl = `https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key=${encodeURIComponent(this.qrcodeKey)}`;
+    const res = await requestUrl({ url: pollUrl, method: "GET", headers: this.plugin.biliHeaders(), throw: false });
+    let data;
+    try { data = res.json || JSON.parse(res.text || "{}"); } catch (e) { data = {}; }
     if (this.cancelled) return;
     const code = data.data ? data.data.code : data.code;
     if (code === 0) {
       statusEl.setText("登录成功，正在写入 Cookie…");
-      const callbackUrl = new URL(data.data.url);
-      const cookies = {};
-      for (const name of ["SESSDATA", "bili_jct", "DedeUserID", "DedeUserID__ckMd5", "sid"]) {
-        const value = callbackUrl.searchParams.get(name);
-        if (value) cookies[name] = value;
+      const rawUrl = (data.data && data.data.url) || "";
+      // Set-Cookie 可能出现在 requestUrl 的 header 里，也可能被 Electron 自动吸收；两种都收
+      let setCookies = [];
+      try {
+        const hdrs = res.headers || {};
+        const sc = hdrs["set-cookie"] || hdrs["Set-Cookie"];
+        if (sc) setCookies = Array.isArray(sc) ? sc : [sc];
+      } catch (e) { /* ignore */ }
+      const cookies = this.parseBiliCookies(rawUrl, setCookies);
+      if (!cookies.SESSDATA) {
+        // 最后一次机会：登录态可能已被 Electron 会话吸收，直接问会话要
+        try {
+          const electron = require("electron");
+          const session = electron.remote && electron.remote.session ? electron.remote.session.defaultSession : (electron.session && electron.session.defaultSession);
+          if (session) {
+            const all = await session.cookies.get({ domain: ".bilibili.com" });
+            for (const c of all) {
+              if (["SESSDATA", "bili_jct", "DedeUserID", "DedeUserID__ckMd5", "sid"].includes(c.name)) cookies[c.name] = c.value;
+            }
+          }
+        } catch (e) { /* ignore */ }
       }
-      if (!cookies.SESSDATA) throw new Error("登录成功但没有拿到 SESSDATA，请重试");
+      if (!cookies.SESSDATA) {
+        throw new Error("登录已成功，但没能从返回里取到 SESSDATA。请点「重试」再扫一次；若反复失败，把这条报错发我。");
+      }
       this.plugin.settings.biliCookies = cookies;
       this.plugin.settings.biliUser = { mid: cookies.DedeUserID || "" };
       await this.plugin.saveSettings();
