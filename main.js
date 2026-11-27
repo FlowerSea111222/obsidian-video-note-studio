@@ -4343,17 +4343,12 @@ class VideoNoteStudio extends Plugin {
     const tags = ["videos"];
     if (this.settings.clipperCompat) tags.push(this.settings.clipperTags || "clippings");
 
+    // 只写用户要的 5 个字段：title / source / author / video_id / tags
     const fm = ["---", `title: ${fmValue(meta.title)}`, `source: ${fmValue(link.url)}`];
     if (meta.author) fm.push(`author: [${fmValue(meta.author)}]`);
-    fm.push(`platform: ${link.kind}`);
     if (link.id) fm.push(`video_id: ${link.id}`);
-    if (meta.published) fm.push(`published: ${meta.published}`);
-    if (meta.duration) fm.push(`duration: ${fmValue(fmtTime(meta.duration))}`);
-    if (this.settings.clipperCompat) fm.push("created: " + today);
-    fm.push("transcript: " + (parts.transcript.length ? "subtitle" : parts.article ? "article" : "none"));
     fm.push("tags:");
     for (const t of tags) fm.push(`  - ${t}`);
-    if (meta.extra) fm.push(`extra: ${fmValue(meta.extra)}`);
     fm.push("---", "");
 
     const body = [];
