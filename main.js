@@ -2632,7 +2632,51 @@ class VideoPlayerView extends ItemView {
     actionBtn("生成笔记", () => this.plugin.importLink(this.link ? this.link.url : this.urlInput.value, { player: this }));
     actionBtn("生成 Canvas", () => this.generateCanvas());
 
+    // ─── 播放器下方空白区：显示当前视频笔记的「概要 / 要点」 ───
+    this.summaryPanel = root.createDiv({ cls: "vns-summary" });
+    this.summaryPanel.createDiv({ cls: "vns-summary-empty", text: "概要会显示在这里（生成笔记后自动载入）" });
+
     // 底部状态栏已移除（用户不需要时间显示）
+  }
+
+  /** 读取笔记并解析出「概要 / 要点」两段 */
+  async loadSummaryPanel() {
+    if (!this.summaryPanel) return;
+    const raw = this.link ? this.link.url : "";
+    const path = this.notePath || (raw ? this.plugin.noteIndex.get(raw) : null);
+    const file = path ? this.app.vault.getAbstractFileByPath(normalizePath(path)) : null;
+    this.summaryPanel.empty();
+    if (!(file instanceof TFile)) {
+      this.summaryPanel.createDiv({ cls: "vns-summary-empty", text: "还没有这篇视频的笔记，点「生成笔记」后这里会显示概要" });
+      return;
+    }
+    const md = await this.app.vault.read(file);
+    const pick = (name) => {
+      const re = new RegExp(`##\\s*${name}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`);
+      const m = md.match(re);
+      return m ? m[1].trim() : "";
+    };
+    const summary = pick("概要");
+    const points = pick("要点");
+    if (!summary && !points) {
+      this.summaryPanel.createDiv({ cls: "vns-summary-empty", text: "这篇笔记没有「概要」章节（可能是没配模型，只有转录）" });
+      return;
+    }
+    const head = this.summaryPanel.createDiv({ cls: "vns-summary-head" });
+    head.createSpan({ cls: "vns-summary-title", text: "概要" });
+    const linkEl = head.createEl("a", { cls: "vns-summary-open", text: "打开笔记" });
+    linkEl.addEventListener("click", () => this.app.workspace.getLeaf("tab").openFile(file));
+    const body = this.summaryPanel.createDiv({ cls: "vns-summary-body" });
+    if (summary) body.createEl("p", { text: summary });
+    if (points) {
+      for (const line of points.split(/\r?\n/)) {
+        const t = line.replace(/^[-*]\s+/, "").trim();
+        if (!t) continue;
+        const row = body.createDiv({ cls: "vns-summary-point" });
+        row.createSpan({ cls: "vns-summary-dot", text: "•" });
+        row.createSpan({ text: t });
+      }
+    }
   }
 
   /** 同步 B站登录按钮显隐：已登录时完全隐藏，不打扰 */
@@ -2761,6 +2805,7 @@ class VideoPlayerView extends ItemView {
     }
     this.mountIframe(src);
     this.setStatus("就绪");
+    this.loadSummaryPanel().catch(() => {});
   }
 
   /** B站：直链原生播放，失败自动回退 iframe */
@@ -4325,7 +4370,8 @@ class VideoNoteStudio extends Plugin {
 
     if (opts.player instanceof VideoPlayerView) {
       opts.player.notePath = path;
-      if (!opts.player.link) opts.player.attach(link);
+      opts.player.link = opts.player.link || link;
+      opts.player.loadSummaryPanel().catch(() => {});
     }
     if (this.settings.autoCanvas) {
       try {
