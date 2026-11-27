@@ -2325,6 +2325,21 @@ const BOOK_EXT = ["md", "txt", "epub"];
 
 function pad2(n) { return String(n).padStart(2, "0"); }
 
+/** 把模型返回的 Markdown 拆成「概要 / 要点」两段 */
+function splitSummary(md) {
+  const src = String(md || "");
+  const grab = (name) => {
+    const re = new RegExp(`##\\s*${name}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`);
+    const m = src.match(re);
+    return m ? m[1].trim() : "";
+  };
+  let overview = grab("概要");
+  let points = grab("要点");
+  // 模型没按格式来时，整体当作概要
+  if (!overview && !points && src.trim()) overview = src.trim();
+  return { overview, points };
+}
+
 /** B站 qn → 中文画质名 */
 function biliQualityLabel(qn) {
   const map = {
@@ -2643,39 +2658,67 @@ class VideoPlayerView extends ItemView {
   /** 读取笔记并解析出「概要 / 要点」两段 */
   async loadSummaryPanel() {
     if (!this.summaryPanel) return;
-    const raw = this.link ? this.link.url : "";
-    const path = this.notePath || (raw ? this.plugin.noteIndex.get(raw) : null);
-    const file = path ? this.app.vault.getAbstractFileByPath(normalizePath(path)) : null;
     this.summaryPanel.empty();
-    if (!(file instanceof TFile)) {
-      this.summaryPanel.createDiv({ cls: "vns-summary-empty", text: "还没有这篇视频的笔记，点「生成笔记」后这里会显示概要" });
+    if (!this.link) {
+      this.summaryPanel.createDiv({ cls: "vns-summary-empty", text: "播放视频后，这里显示概要和时间戳" });
       return;
     }
-    const md = await this.app.vault.read(file);
-    const pick = (name) => {
-      const re = new RegExp(`##\\s*${name}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`);
-      const m = md.match(re);
-      return m ? m[1].trim() : "";
-    };
-    const summary = pick("概要");
-    const points = pick("要点");
-    if (!summary && !points) {
-      this.summaryPanel.createDiv({ cls: "vns-summary-empty", text: "这篇笔记没有「概要」章节（可能是没配模型，只有转录）" });
+    let data = await this.plugin.loadPanelData(this.link);
+    let noteFile = null;
+    const path = this.notePath || this.plugin.noteIndex.get(this.link.url);
+    if (path) {
+      const f = this.app.vault.getAbstractFileByPath(normalizePath(path));
+      if (f instanceof TFile) noteFile = f;
+    }
+    // 兼容旧笔记：面板数据不存在时，从笔记里解析
+    if (!data && noteFile) {
+      const md = await this.app.vault.read(noteFile);
+      const pick = (name) => {
+        const re = new RegExp(`##\\s*${name}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`);
+        const m = md.match(re);
+        return m ? m[1].trim() : "";
+      };
+      const overview = pick("概要");
+      const tsSection = pick("时间戳");
+      const transcript = [];
+      for (const line of tsSection.split(/\r?\n/)) {
+        const m = line.match(/^-\s*\[(\d+):(\d{2})\][^)]*\)?\s*(.*)$/);
+        if (!m) continue;
+        transcript.push([Number(m[1]) * 60 + Number(m[2]), m[3].replace(/\]\([^)]*\)/, "").trim()]);
+      }
+      if (overview || transcript.length) data = { overview, transcript };
+    }
+    if (!data || (!data.overview && !(data.transcript || []).length)) {
+      this.summaryPanel.createDiv({
+        cls: "vns-summary-empty",
+        text: noteFile ? "这篇还没有概要和时间戳（可能需要配模型或先做转录）" : "还没有这篇视频的笔记，点「生成笔记」后这里会出现概要和时间戳",
+      });
       return;
     }
-    const head = this.summaryPanel.createDiv({ cls: "vns-summary-head" });
-    head.createSpan({ cls: "vns-summary-title", text: "概要" });
-    const linkEl = head.createEl("a", { cls: "vns-summary-open", text: "打开笔记" });
-    linkEl.addEventListener("click", () => this.app.workspace.getLeaf("tab").openFile(file));
-    const body = this.summaryPanel.createDiv({ cls: "vns-summary-body" });
-    if (summary) body.createEl("p", { text: summary });
-    if (points) {
-      for (const line of points.split(/\r?\n/)) {
-        const t = line.replace(/^[-*]\s+/, "").trim();
-        if (!t) continue;
-        const row = body.createDiv({ cls: "vns-summary-point" });
-        row.createSpan({ cls: "vns-summary-dot", text: "•" });
-        row.createSpan({ text: t });
+
+    if (data.overview) {
+      const head = this.summaryPanel.createDiv({ cls: "vns-summary-head" });
+      head.createSpan({ cls: "vns-summary-title", text: "概要" });
+      if (noteFile) {
+        const linkEl = head.createEl("a", { cls: "vns-summary-open", text: "打开笔记" });
+        linkEl.addEventListener("click", () => this.app.workspace.getLeaf("tab").openFile(noteFile));
+      }
+      this.summaryPanel.createDiv({ cls: "vns-summary-body" }).createEl("p", { text: data.overview });
+    }
+
+    const transcript = data.transcript || [];
+    if (transcript.length) {
+      this.summaryPanel.createDiv({ cls: "vns-summary-title vns-summary-title-gap", text: "时间戳" });
+      const list = this.summaryPanel.createDiv({ cls: "vns-ts-list" });
+      for (const [t, text] of transcript) {
+        const row = list.createDiv({ cls: "vns-ts-row" });
+        const stamp = row.createEl("a", { cls: "vns-ts-time", text: fmtTime(t) });
+        stamp.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          this.seek(t);
+          if (this.videoEl) this.videoEl.play().catch(() => {});
+        });
+        row.createSpan({ cls: "vns-ts-text", text: String(text) });
       }
     }
   }
@@ -3889,6 +3932,33 @@ class VideoNoteStudio extends Plugin {
     }, true);
   }
 
+  /** 播放器下方面板的数据（概要 + 时间戳）存放在隐藏目录 .vns/panels */
+  panelCacheDir() { return ".vns/panels"; }
+
+  panelKey(link) {
+    const raw = (link && (link.id || link.url)) || "x";
+    return String(raw).replace(/[^0-9A-Za-z_-]/g, "_").slice(0, 100);
+  }
+
+  async savePanelData(link, data) {
+    try {
+      const adapter = this.app.vault.adapter;
+      const dir = this.panelCacheDir();
+      if (!(await adapter.exists(dir))) await adapter.mkdir(dir);
+      const path = `${dir}/${this.panelKey(link)}.json`;
+      await adapter.write(path, JSON.stringify(Object.assign({ url: link.url, updated: Date.now() }, data)));
+    } catch (e) { console.debug("[vns] 面板数据保存失败", e.message); }
+  }
+
+  async loadPanelData(link) {
+    try {
+      const adapter = this.app.vault.adapter;
+      const path = `${this.panelCacheDir()}/${this.panelKey(link)}.json`;
+      if (!(await adapter.exists(path))) return null;
+      return JSON.parse(await adapter.read(path));
+    } catch (e) { return null; }
+  }
+
   /** 从任意 href/文本里还原出视频 URL（兼容 obsidian://、相对链接、裸文本） */
   resolveVideoUrl(raw) {
     let s = String(raw || "").trim();
@@ -4392,6 +4462,12 @@ class VideoNoteStudio extends Plugin {
     const path = uniquePath(this.app, this.settings.inboxFolder, slug(meta.title));
     const file = await this.app.vault.create(path, md);
     this.noteIndex.set(url, path);
+    // 概要 + 时间戳存到隐藏目录，供播放器下方面板读取
+    await this.savePanelData(link, {
+      title: meta.title,
+      overview: splitSummary(summary).overview,
+      transcript,
+    });
 
     if (opts.player instanceof VideoPlayerView) {
       opts.player.notePath = path;
@@ -4432,28 +4508,18 @@ class VideoNoteStudio extends Plugin {
       body.push("## 分P", "", ...meta.pages.map((p) => `- ${p}`), "");
     }
     if (parts.summary) {
-      body.push(parts.summary.trim(), "");
-    } else if (parts.transcript.length) {
-      body.push("> [!note] 没配模型（API Key 或 magpie 路由），所以没有自动摘要；下面是逐句转录。", "");
+      const sp = splitSummary(parts.summary);
+      if (sp.points) body.push("## 要点", "", sp.points.trim(), "");
     }
     if (parts.article) {
       body.push("## 正文", "", parts.article.trim().slice(0, 12000), "");
     }
-    body.push("## 时间戳", "");
-    if (parts.transcript.length) {
-      for (const [t, text] of parts.transcript) {
-        body.push(`- [${fmtTime(t)}](${tsLink(link, t, this.settings.timestampMode)}) ${text}`);
-      }
-    } else {
-      body.push("> [!warning] 这篇笔记没能拿到正文，原因逐条列在下面：", "");
-      body.push("- **平台字幕**：没有。B站 多数视频只提供弹幕流，没有 CC / AI 字幕，yt-dlp 抓不到文本。");
-      body.push(`- **本地转录**：${this.settings.asrEnabled ? "已开启但失败" : "未开启——去「设置 → 本地转录」打开它"}。`);
+    // 「概要」与「时间戳」不再写进笔记：它们在播放器下方面板显示
+    if (!parts.summary && !parts.transcript.length && !parts.article) {
+      body.push("> [!warning] 没拿到正文：平台字幕没有，本地转录未成功，也没配模型。", "");
       if (this.settings.lastAsrError) {
-        body.push(`  - 具体报错：\`${String(this.settings.lastAsrError).slice(0, 300)}\``);
+        body.push(`> 本地转录报错：\`${String(this.settings.lastAsrError).slice(0, 200)}\``, "");
       }
-      body.push("- **AI 摘要**：需要填模型 API Key，或在设置里开启「使用 magpie 路由」。");
-      body.push("");
-      body.push("只有链接与元数据。");
     }
     return fm.join("\n") + body.join("\n");
   }
