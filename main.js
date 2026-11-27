@@ -2629,7 +2629,6 @@ class VideoPlayerView extends ItemView {
     };
     actionBtn("⏱ 打时间戳", () => this.captureTimestamp(), "is-accent");
     const actionSpacer = this.actionBar.createDiv({ cls: "vns-actionbar-spacer" });
-    actionBtn("打开笔记", () => this.openNote());
     actionBtn("生成笔记", () => this.plugin.importLink(this.link ? this.link.url : this.urlInput.value, { player: this }));
     actionBtn("生成 Canvas", () => this.generateCanvas());
 
