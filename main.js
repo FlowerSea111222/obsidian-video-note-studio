@@ -2451,6 +2451,23 @@ function embedFor(link, startAt) {
   return null;
 }
 
+/** B站 内嵌播放器地址（隐藏弹幕、隐藏相关推荐、可按需隐藏自带控制条） */
+function biliEmbedUrl(link, startAt, hideControls) {
+  const t = Math.max(0, Math.floor(startAt || 0));
+  const parts = [
+    `bvid=${link.id}`,
+    `page=${link.page || 1}`,
+    "high_quality=1",
+    "danmaku=0",
+    "autoplay=" + (t > 0 ? 1 : 0),
+    "as_wide=1",
+    "hideDanmaku=true",
+  ];
+  if (t > 0) parts.push(`t=${t}`);
+  if (hideControls) parts.push("noShare=true");
+  return `https://player.bilibili.com/player.html?${parts.join("&")}`;
+}
+
 /** 生成能在 Obsidian 内部跳转播放的时间戳链接（走插件注册的 obsidian://vns 协议） */
 function tsLink(link, sec, mode) {
   const s = Math.max(0, Math.floor(sec || 0));
@@ -2494,6 +2511,9 @@ const DEFAULT_SETTINGS = {
   timestampMode: "inapp",
   ytDlpPath: "yt-dlp",
   asrEnabled: true,
+  biliNative: false,
+  embedFullscreen: true,
+  biliNativeQn: 80,
   pythonPath: "python",
   asrModel: "small",
   asrLanguage: "",
@@ -2595,7 +2615,9 @@ class VideoPlayerView extends ItemView {
     btn(secondary, "打开笔记", () => this.openNote());
     btn(secondary, "生成笔记", () => this.plugin.importLink(this.link ? this.link.url : this.urlInput.value, { player: this }));
     btn(secondary, "生成 Canvas", () => this.generateCanvas());
-    // B站播放器原生带弹幕开关，这里默认关闭弹幕（danmaku=0），不再重复放一个开关按钮
+    // B站：沉浸/原尺寸切换（只对 iframe 模式可见）
+    this.zoomBtn = btn(secondary, "沉浸", () => this.toggleEmbedZoom(), "is-ghost");
+    this.zoomBtn.style.display = "none";
 
     // 信息与账号状态独立一行
     const metaRow = toolbar.createDiv({ cls: "vns-meta-row" });
@@ -2707,6 +2729,7 @@ class VideoPlayerView extends ItemView {
     this.setStatus("加载中…");
     this.updateMeta(link);
     this.hideQualityMenu();
+    if (this.zoomBtn) this.zoomBtn.style.display = "none";
 
     if (link.kind === "file") {
       const f = link.file || this.app.vault.getAbstractFileByPath(normalizePath(link.url));
@@ -2722,7 +2745,8 @@ class VideoPlayerView extends ItemView {
 
     if (link.kind === "bilibili") {
       this.urlInput.value = link.url;
-      this.loadBilibili(link, startAt);
+      if (this.plugin.settings.biliNative) this.loadBilibili(link, startAt);
+      else this.mountBiliIframe(link, startAt);
       return;
     }
 
@@ -2825,6 +2849,43 @@ class VideoPlayerView extends ItemView {
     });
     this.timer = setInterval(() => this.tick(), 500);
     this.updateClock();
+  }
+
+  /** B站 iframe：沉浸式容器 + 裁切，藏掉播放器自带的多余 UI */
+  mountBiliIframe(link, startAt) {
+    this.destroyPlayerChrome();
+    this.stage.empty();
+    this.videoEl = null;
+    this.audioEl = null;
+    this.iframeEl = null;
+    this.biliStream = null;
+
+    const frame = this.stage.createDiv({ cls: "vns-embed vns-embed-bili" });
+    // B站 播放器页面本身有 16:9 播放入口 + 下方推荐/信息区，用一个 overflow:hidden 容器按比例放大裁掉
+    const inner = frame.createDiv({ cls: "vns-embed-inner" });
+    this.iframeEl = inner.createEl("iframe", {
+      attr: {
+        src: biliEmbedUrl(link, startAt, this.plugin.settings.embedFullscreen !== false),
+        allow: "autoplay; fullscreen; picture-in-picture; encrypted-media",
+        allowfullscreen: "true",
+        frameborder: "0",
+        scrolling: "no",
+        referrerpolicy: "no-referrer",
+      },
+    });
+    this._embedKind = "bilibili";
+    if (this.zoomBtn) this.zoomBtn.style.display = "";
+    this.setStatus("内嵌播放（沉浸模式）");
+    this.timer = setInterval(() => this.tick(), 500);
+    this.updateClock();
+  }
+
+  /** 供控制条调用：切沉浸/原尺寸 */
+  toggleEmbedZoom() {
+    const frame = this.stage.querySelector(".vns-embed");
+    if (!frame) return;
+    frame.classList.toggle("is-zoomed");
+    this.setStatus(frame.classList.contains("is-zoomed") ? "沉浸模式（已裁切播放器自带的界面）" : "原尺寸");
   }
 
   /** 原生播放器：视频 + 可选独立音轨（DASH）+ 自绘控制条 */
@@ -3176,9 +3237,7 @@ class VnsSettingTab extends PluginSettingTab {
       .addButton((b) => b.setButtonText(this.plugin.hasBiliLogin() ? "管理登录" : "扫码登录").onClick(() => {
         new BiliLoginModal(this.app, this.plugin, async () => this.display()).open();
       }));
-    new Setting(containerEl).setName("B站 播放").setDesc(this.plugin._biliRefererOk
-      ? "原生播放器已启用（直链 + 自绘控制条）"
-      : "⚠ Referer 注入未生效，B站 将回退内嵌播放器；重载插件可重试")
+    new Setting(containerEl).setName("B站 播放").setDesc("默认用内嵌播放器（稳定）；想要原生控制条可开启下方开关")
       .addButton((b) => b.setButtonText("测试直链").onClick(async () => {
         b.setDisabled(true);
         try {
@@ -3187,6 +3246,8 @@ class VnsSettingTab extends PluginSettingTab {
         } catch (e) { new Notice(`诊断失败：${e.message}`, 15000); }
         finally { b.setDisabled(false); }
       }));
+    toggle("B站 使用原生播放器（实验）", "biliNative", "走 playurl 直链 + 自绘控制条；失败会自动回退内嵌播放器。目前部分环境解析不通，默认关闭");
+    toggle("内嵌播放器自动沉浸裁切", "embedFullscreen", "把 B站 自带的底部控制条/推荐区挤出画面，只留视频本体");
     new Setting(containerEl).setName("测试本地转录").setDesc("检查 Python、faster-whisper 与 asr_bridge.py 是否就位")
       .addButton((b) => b.setButtonText("运行测试").onClick(async () => {
         b.setDisabled(true);
