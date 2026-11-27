@@ -4302,16 +4302,6 @@ class VideoNoteStudio extends Plugin {
     body.push(`> \`${link.url}\``);
     body.push("");
 
-    const metaLine = [];
-    if (meta.author) metaLine.push(`**作者**：${meta.author}`);
-    if (meta.duration) metaLine.push(`**时长**：${fmtTime(meta.duration)}`);
-    if (meta.stats) metaLine.push(meta.stats);
-    if (meta.extra) metaLine.push(meta.extra);
-    if (metaLine.length) body.push(metaLine.join(" ｜ "), "");
-
-    if (meta.description) {
-      body.push("## 简介", "", meta.description.trim().slice(0, 2000), "");
-    }
     if (meta.tagList && meta.tagList.length) {
       body.push("## 标签", "", meta.tagList.map((t) => `\`${t}\``).join(" "), "");
     }
@@ -4340,7 +4330,7 @@ class VideoNoteStudio extends Plugin {
       }
       body.push("- **AI 摘要**：需要填模型 API Key，或在设置里开启「使用 magpie 路由」。");
       body.push("");
-      body.push(meta.description ? "简介已写在上面，其余只有链接与元数据。" : "只能记录链接与元数据。");
+      body.push("只有链接与元数据。");
     }
     return fm.join("\n") + body.join("\n");
   }
