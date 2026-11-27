@@ -4,6 +4,7 @@
 /* ── 根布局 ── */
 .vns-root {
   display: flex; flex-direction: column; height: 100%;
+  position: relative;
   background: var(--background-primary);
   font-family: var(--font-interface);
 }
@@ -77,14 +78,6 @@
   color: var(--text-normal);
 }
 
-/* 元信息与账号状态独立成行 */
-.vns-meta-row {
-  display: flex; align-items: center; gap: 12px;
-  padding-top: 7px;
-  border-top: 1px solid var(--background-modifier-border);
-}
-.vns-login-btn { flex-shrink: 0; font-size: 11px; padding: 2px 8px; }
-
 /* 元信息 */
 .vns-meta {
   flex: 1; min-width: 0;
@@ -110,6 +103,37 @@
 .vns-login-account { font-size: 15px; font-weight: 600; margin: 14px 0 8px; }
 .vns-login-actions { display: flex; justify-content: center; gap: 8px; margin-top: 18px; }
 .vns-login-error { color: var(--text-error); font-size: 13px; margin: 14px 0; overflow-wrap: anywhere; }
+
+/* 视频信息：贴在播放器下方，一行内左对齐，仅在播放时出现 */
+.vns-meta-inline {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 16px 0;
+  min-height: 0;
+}
+.vns-meta-inline .vns-meta-title {
+  font-size: 13px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0;
+}
+.vns-meta-inline .vns-meta-sub {
+  font-size: 11px; color: var(--text-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+/* 未登录时才出现的 B站登录小按钮 */
+.vns-login-inline {
+  position: absolute;
+  right: 16px;
+  bottom: 8px;
+  font-size: 11px;
+  padding: 2px 8px;
+  opacity: 0.75;
+  z-index: 4;
+}
+.vns-login-inline:hover { opacity: 1; }
 
 /* 播放器下方的操作条 */
 .vns-actionbar {
@@ -321,7 +345,6 @@
   .vns-input-row { flex-direction: column; align-items: stretch; }
   .vns-btn-group { justify-content: flex-end; }
   .vns-actionbar { padding: 6px 12px; }
-  .vns-meta-row { flex-wrap: wrap; }
   .vns-meta { flex-direction: row; gap: 8px; align-items: center; }
   .vns-meta-title { flex: 1; min-width: 0; }
   .vns-meta-sub { flex-shrink: 0; }
