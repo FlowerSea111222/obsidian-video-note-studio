@@ -219,17 +219,16 @@
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: var(--background-primary);
   overflow: hidden;
 }
-/* 16:9 但不超过可用高度：min() 取两者较小值，保证不溢出也不留大黑边 */
+/* 视频留在上方：按 16:9 自适应，宽度撑满；不垂直居中 */
 .vns-stage {
   position: relative;
-  width: min(100%, calc((100vh - 190px) * 16 / 9));
+  width: 100%;
   aspect-ratio: 16 / 9;
-  max-width: 100%;
   max-height: 100%;
   overflow: hidden;
   background: #000;
@@ -244,16 +243,41 @@
   background: var(--background-primary);
 }
 
-/* 播放器下方的操作条 */
+/* 播放器下方的操作条：紧贴视频，按钮风格统一 */
 .vns-actionbar {
-  display: flex; align-items: center; gap: 6px;
-  padding: 8px 16px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px;
   background: var(--background-secondary);
   border-top: 1px solid var(--background-modifier-border);
   flex-wrap: wrap;
   flex-shrink: 0;
 }
 .vns-actionbar-spacer { flex: 1; }
+/* 统一操作条内所有按钮：同一尺寸、同一描边风格 */
+.vns-actionbar .vns-btn {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  height: 30px;
+  line-height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  box-shadow: none;
+}
+.vns-actionbar .vns-btn:hover {
+  background: var(--interactive-hover);
+}
+/* 主按钮：仅换配色，尺寸与其它按钮完全一致 */
+.vns-actionbar .vns-btn.is-accent {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: transparent;
+}
+.vns-actionbar .vns-btn.is-accent:hover {
+  background: var(--interactive-accent-hover);
+}
 
 /* 底部状态栏 */
 .vns-statusbar {
