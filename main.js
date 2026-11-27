@@ -2512,7 +2512,6 @@ const DEFAULT_SETTINGS = {
   ytDlpPath: "yt-dlp",
   asrEnabled: true,
   biliNative: false,
-  embedFullscreen: true,
   biliNativeQn: 80,
   pythonPath: "python",
   asrModel: "small",
@@ -2615,10 +2614,6 @@ class VideoPlayerView extends ItemView {
     btn(secondary, "打开笔记", () => this.openNote());
     btn(secondary, "生成笔记", () => this.plugin.importLink(this.link ? this.link.url : this.urlInput.value, { player: this }));
     btn(secondary, "生成 Canvas", () => this.generateCanvas());
-    // B站：沉浸/原尺寸切换（只对 iframe 模式可见）
-    this.zoomBtn = btn(secondary, "沉浸", () => this.toggleEmbedZoom(), "is-ghost");
-    this.zoomBtn.style.display = "none";
-
     // 信息与账号状态独立一行
     const metaRow = toolbar.createDiv({ cls: "vns-meta-row" });
     this.metaEl = metaRow.createDiv({ cls: "vns-meta" });
@@ -2729,7 +2724,6 @@ class VideoPlayerView extends ItemView {
     this.setStatus("加载中…");
     this.updateMeta(link);
     this.hideQualityMenu();
-    if (this.zoomBtn) this.zoomBtn.style.display = "none";
 
     if (link.kind === "file") {
       const f = link.file || this.app.vault.getAbstractFileByPath(normalizePath(link.url));
@@ -2743,10 +2737,9 @@ class VideoPlayerView extends ItemView {
       return;
     }
 
-    if (link.kind === "bilibili") {
+    if (link.kind === "bilibili" && this.plugin.settings.biliNative) {
       this.urlInput.value = link.url;
-      if (this.plugin.settings.biliNative) this.loadBilibili(link, startAt);
-      else this.mountBiliIframe(link, startAt);
+      this.loadBilibili(link, startAt);
       return;
     }
 
@@ -2849,43 +2842,6 @@ class VideoPlayerView extends ItemView {
     });
     this.timer = setInterval(() => this.tick(), 500);
     this.updateClock();
-  }
-
-  /** B站 iframe：沉浸式容器 + 裁切，藏掉播放器自带的多余 UI */
-  mountBiliIframe(link, startAt) {
-    this.destroyPlayerChrome();
-    this.stage.empty();
-    this.videoEl = null;
-    this.audioEl = null;
-    this.iframeEl = null;
-    this.biliStream = null;
-
-    const frame = this.stage.createDiv({ cls: "vns-embed vns-embed-bili" });
-    // B站 播放器页面本身有 16:9 播放入口 + 下方推荐/信息区，用一个 overflow:hidden 容器按比例放大裁掉
-    const inner = frame.createDiv({ cls: "vns-embed-inner" });
-    this.iframeEl = inner.createEl("iframe", {
-      attr: {
-        src: biliEmbedUrl(link, startAt, this.plugin.settings.embedFullscreen !== false),
-        allow: "autoplay; fullscreen; picture-in-picture; encrypted-media",
-        allowfullscreen: "true",
-        frameborder: "0",
-        scrolling: "no",
-        referrerpolicy: "no-referrer",
-      },
-    });
-    this._embedKind = "bilibili";
-    if (this.zoomBtn) this.zoomBtn.style.display = "";
-    this.setStatus("内嵌播放（沉浸模式）");
-    this.timer = setInterval(() => this.tick(), 500);
-    this.updateClock();
-  }
-
-  /** 供控制条调用：切沉浸/原尺寸 */
-  toggleEmbedZoom() {
-    const frame = this.stage.querySelector(".vns-embed");
-    if (!frame) return;
-    frame.classList.toggle("is-zoomed");
-    this.setStatus(frame.classList.contains("is-zoomed") ? "沉浸模式（已裁切播放器自带的界面）" : "原尺寸");
   }
 
   /** 原生播放器：视频 + 可选独立音轨（DASH）+ 自绘控制条 */
@@ -3247,7 +3203,6 @@ class VnsSettingTab extends PluginSettingTab {
         finally { b.setDisabled(false); }
       }));
     toggle("B站 使用原生播放器（实验）", "biliNative", "走 playurl 直链 + 自绘控制条；失败会自动回退内嵌播放器。目前部分环境解析不通，默认关闭");
-    toggle("内嵌播放器自动沉浸裁切", "embedFullscreen", "把 B站 自带的底部控制条/推荐区挤出画面，只留视频本体");
     new Setting(containerEl).setName("测试本地转录").setDesc("检查 Python、faster-whisper 与 asr_bridge.py 是否就位")
       .addButton((b) => b.setButtonText("运行测试").onClick(async () => {
         b.setDisabled(true);
