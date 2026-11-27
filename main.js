@@ -2611,9 +2611,6 @@ class VideoPlayerView extends ItemView {
     this.stage = this.stageWrap.createDiv({ cls: "vns-stage" });
     this.stage.createDiv({ cls: "vns-empty", text: "粘贴链接或选择本地视频开始" });
 
-    // 视频信息（仅在播放时显示，不常驻）
-    this.metaEl = root.createDiv({ cls: "vns-meta vns-meta-inline" });
-    this.metaEl.style.display = "none";
     // B站登录按钮仅在未登录时提示；已登录不显示
     this.biliLoginBtn = root.createEl("button", {
       cls: "vns-btn is-ghost vns-login-inline",
@@ -2648,21 +2645,8 @@ class VideoPlayerView extends ItemView {
     this.biliLoginBtn.style.display = logged ? "none" : "";
   }
 
+  /** 视频信息行已移除（用户要求直接删掉，不做展示），保留空方法兼容调用点 */
   updateMeta(link) {
-    if (!this.metaEl) return;
-    this.metaEl.empty();
-    if (!link || (!link.title && !link.author)) {
-      this.metaEl.style.display = "none";
-      this._syncBiliLoginBtn();
-      return;
-    }
-    this.metaEl.style.display = "";
-    if (link.title) this.metaEl.createSpan({ cls: "vns-meta-title", text: link.title });
-    const metaItems = [];
-    if (link.author) metaItems.push(link.author);
-    if (link.duration) metaItems.push(fmtTime(link.duration));
-    if (link.published) metaItems.push(link.published);
-    if (metaItems.length) this.metaEl.createSpan({ cls: "vns-meta-sub", text: metaItems.join(" · ") });
     this._syncBiliLoginBtn();
   }
 
