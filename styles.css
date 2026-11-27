@@ -156,6 +156,140 @@
   font-size: 11px; color: var(--text-faint);
 }
 
+/* ── 原生播放器（自绘控制条） ── */
+.vns-player {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  background: #000;
+  overflow: hidden;
+}
+.vns-video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  background: #000;
+  cursor: pointer;
+  outline: none;
+}
+.vns-audio { display: none; }
+
+.vns-player-msg {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 70%;
+  padding: 12px 20px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff; font-size: 13px; text-align: center;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  z-index: 3;
+}
+.vns-player-msg.is-hidden { display: none; }
+
+/* 控制条 */
+.vns-ctl {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 24px 12px 8px;
+  background: linear-gradient(to top, rgba(0,0,0,0.86), rgba(0,0,0,0.45) 55%, transparent);
+  opacity: 0;
+  transition: opacity 180ms ease;
+  z-index: 2;
+}
+.vns-player:hover .vns-ctl,
+.vns-ctl.is-active { opacity: 1; }
+
+/* 进度条 */
+.vns-ctl-progress {
+  position: relative;
+  height: 4px;
+  margin: 0 2px 8px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.22);
+  cursor: pointer;
+}
+.vns-ctl-progress:hover { height: 6px; }
+.vns-ctl-progress-buffer {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 0;
+  background: rgba(255,255,255,0.3);
+  border-radius: 2px;
+}
+.vns-ctl-progress-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 0;
+  background: var(--interactive-accent);
+  border-radius: 2px;
+  z-index: 1;
+}
+.vns-ctl-progress:hover .vns-ctl-progress-fill::after {
+  content: ""; position: absolute; right: -6px; top: 50%;
+  width: 12px; height: 12px; margin-top: -6px;
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+/* 按钮行 */
+.vns-ctl-row {
+  display: flex; align-items: center; gap: 8px;
+  color: #fff;
+}
+.vns-ctl-spacer { flex: 1; }
+.vns-ctl-btn {
+  background: transparent; border: 0; color: #fff;
+  font-size: 14px; line-height: 1;
+  padding: 4px 6px; border-radius: 5px;
+  cursor: pointer; opacity: 0.9;
+  transition: background 120ms ease, opacity 120ms ease;
+}
+.vns-ctl-btn:hover { background: rgba(255,255,255,0.16); opacity: 1; }
+.vns-ctl-play { font-size: 16px; min-width: 26px; }
+.vns-ctl-time {
+  font-size: 12px; font-variant-numeric: tabular-nums;
+  color: rgba(255,255,255,0.92);
+  letter-spacing: 0.2px;
+}
+.vns-ctl-rate, .vns-ctl-quality {
+  font-size: 12px; padding: 3px 8px;
+  border: 1px solid rgba(255,255,255,0.26);
+  border-radius: 4px;
+}
+.vns-ctl-vol { display: flex; align-items: center; gap: 4px; }
+.vns-ctl-vol-slider {
+  width: 0; opacity: 0;
+  transition: width 160ms ease, opacity 160ms ease;
+  accent-color: var(--interactive-accent);
+}
+.vns-ctl-vol:hover .vns-ctl-vol-slider { width: 68px; opacity: 1; }
+
+/* 画质菜单 */
+.vns-quality-menu {
+  position: fixed;
+  min-width: 132px;
+  padding: 5px;
+  border-radius: 8px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.28);
+  z-index: 9999;
+}
+.vns-quality-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 5px;
+  color: var(--text-normal);
+  cursor: pointer;
+}
+.vns-quality-item:hover { background: var(--background-modifier-hover); }
+.vns-quality-item.is-current {
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+.vns-quality-item.is-locked {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
 /* ── 设置页 ── */
 .vns-setting-note {
   font-size: 12px; color: var(--text-muted); margin-top: 4px;
