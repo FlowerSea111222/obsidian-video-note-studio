@@ -2428,7 +2428,7 @@ function embedFor(link, startAt) {
   const auto = t > 0 ? 1 : 0;
   if (link.kind === "bilibili") {
     return `https://player.bilibili.com/player.html?bvid=${link.id}&page=${link.page || 1}`
-      + `&high_quality=1&danmaku=0&autoplay=${auto}${t ? `&t=${t}` : ""}`;
+      + `&high_quality=1&danmaku=0&autoplay=${auto}`;
   }
   if (link.kind === "youtube") {
     return `https://www.youtube.com/embed/${link.id}?enablejsapi=1&rel=0`
@@ -2584,6 +2584,7 @@ class VideoPlayerView extends ItemView {
     btn(secondary, "打开笔记", () => this.openNote());
     btn(secondary, "生成笔记", () => this.plugin.importLink(this.link ? this.link.url : this.urlInput.value, { player: this }));
     btn(secondary, "生成 Canvas", () => this.generateCanvas());
+    // B站播放器原生带弹幕开关，这里默认关闭弹幕（danmaku=0），不再重复放一个开关按钮
 
     // 信息与账号状态独立一行
     const metaRow = toolbar.createDiv({ cls: "vns-meta-row" });
