@@ -2606,15 +2606,7 @@ class VideoPlayerView extends ItemView {
     btn(sourceBtns, "本地", () => this.plugin.pickLocalVideo((f) => this.loadFile(f)));
     btn(sourceBtns, "清除", () => this.clearAll(), "is-ghost");
 
-    // 操作：主操作在左，笔记相关在右，不再和标题挤在一起
-    const actionRow = toolbar.createDiv({ cls: "vns-action-row" });
-    const primary = actionRow.createDiv({ cls: "vns-primary-actions" });
-    btn(primary, "⏱ 打时间戳", () => this.captureTimestamp(), "is-accent");
-    const secondary = actionRow.createDiv({ cls: "vns-secondary-actions" });
-    btn(secondary, "打开笔记", () => this.openNote());
-    btn(secondary, "生成笔记", () => this.plugin.importLink(this.link ? this.link.url : this.urlInput.value, { player: this }));
-    btn(secondary, "生成 Canvas", () => this.generateCanvas());
-    // 信息与账号状态独立一行
+    // 信息与账号状态
     const metaRow = toolbar.createDiv({ cls: "vns-meta-row" });
     this.metaEl = metaRow.createDiv({ cls: "vns-meta" });
     this.updateMeta(null);
@@ -2622,9 +2614,23 @@ class VideoPlayerView extends ItemView {
       () => this.openBiliLogin(), "is-ghost vns-login-btn");
     this.biliLoginBtn.title = "扫码登录后，播放器使用你的账号清晰度（具体画质取决于视频与账号权限）";
 
+    // ─── 播放器（紧贴输入区下方，尽量上移）───
     this.stageWrap = root.createDiv({ cls: "vns-stage-wrap" });
     this.stage = this.stageWrap.createDiv({ cls: "vns-stage" });
     this.stage.createDiv({ cls: "vns-empty", text: "粘贴链接或选择本地视频开始" });
+
+    // ─── 播放器下方：操作按钮行 ───
+    this.actionBar = root.createDiv({ cls: "vns-actionbar" });
+    const actionBtn = (label, fn, cls) => {
+      const b = this.actionBar.createEl("button", { cls: `vns-btn ${cls || ""}`, text: label });
+      b.addEventListener("click", fn);
+      return b;
+    };
+    actionBtn("⏱ 打时间戳", () => this.captureTimestamp(), "is-accent");
+    const actionSpacer = this.actionBar.createDiv({ cls: "vns-actionbar-spacer" });
+    actionBtn("打开笔记", () => this.openNote());
+    actionBtn("生成笔记", () => this.plugin.importLink(this.link ? this.link.url : this.urlInput.value, { player: this }));
+    actionBtn("生成 Canvas", () => this.generateCanvas());
 
     const statusBar = root.createDiv({ cls: "vns-statusbar" });
     this.clockEl = statusBar.createEl("span", { cls: "vns-time", text: "0:00 / 0:00" });
