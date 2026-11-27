@@ -3647,6 +3647,7 @@ class VideoNoteStudio extends Plugin {
     this.registerObsidianProtocolHandler("vns", (params) => this.handleVnsProtocol(params));
     this.setupBiliReferer();
     this.bridgePath = this.resolveBridgePath();
+    this.registerSourceClick();
     this.addRibbonIcon("play-circle", "打开视频播放器", () => this.openPlayer());
     this.addSettingTab(new VnsSettingTab(this.app, this));
 
@@ -3785,6 +3786,67 @@ class VideoNoteStudio extends Plugin {
       }
     }
     return "找不到可用的 Python，请把「Python 路径」填成 python.exe 的完整路径";
+  }
+
+  /** 点击笔记属性里的 source（视频链接）→ 用插件播放器打开 */
+  registerSourceClick() {
+    // 阅读视图 / 属性面板里的链接点击
+    this.registerDomEvent(document, "click", (ev) => {
+      const a = ev.target && ev.target.closest ? ev.target.closest("a") : null;
+      if (!a) return;
+      const href = a.getAttribute("href") || a.getAttribute("data-href") || "";
+      if (!href) return;
+      const url = this.resolveVideoUrl(href);
+      if (!url) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.playVideoUrl(url);
+    }, true);
+
+    // 属性面板（Properties）里 source 字段的原始文本值，点击也可播
+    this.registerDomEvent(document, "click", (ev) => {
+      const el = ev.target;
+      if (!el || !el.closest) return;
+      const prop = el.closest(".metadata-property");
+      if (!prop) return;
+      const key = prop.getAttribute("data-property-key") || "";
+      if (key !== "source") return;
+      const valueEl = prop.querySelector(".metadata-property-value a, .metadata-property-value");
+      const raw = valueEl ? (valueEl.getAttribute("href") || valueEl.textContent || "") : "";
+      const url = this.resolveVideoUrl(raw);
+      if (!url) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.playVideoUrl(url);
+    }, true);
+  }
+
+  /** 从任意 href/文本里还原出视频 URL（兼容 obsidian://、相对链接、裸文本） */
+  resolveVideoUrl(raw) {
+    let s = String(raw || "").trim();
+    if (!s) return null;
+    if (s.startsWith("obsidian://")) {
+      try {
+        const u = new URL(s);
+        const target = u.searchParams.get("url") || u.searchParams.get("u") || "";
+        s = decodeURIComponent(target);
+      } catch (e) { return null; }
+    }
+    if (/^(bilibili\.com|www\.bilibili\.com|player\.bilibili)/i.test(s)) s = `https://${s}`;
+    if (!/^https?:\/\//i.test(s)) return null;
+    const kind = detectLink(s).kind;
+    if (!["bilibili", "youtube", "douyin", "direct", "short"].includes(kind)) return null;
+    return s;
+  }
+
+  /** 用播放器 leaf 打开并播放给定链接 */
+  async playVideoUrl(url) {
+    const leaf = await this.openPlayer();
+    const view = leaf && leaf.view;
+    if (view instanceof VideoPlayerView) {
+      if (view.urlInput) view.urlInput.value = url;
+      await view.load(url);
+    }
   }
 
   async handleVnsProtocol(params) {
@@ -4296,11 +4358,7 @@ class VideoNoteStudio extends Plugin {
     fm.push("---", "");
 
     const body = [];
-    const embed = embedFor(link);
-    body.push(`> [!info] 播放`);
-    body.push(`> 用命令 **Video Note Studio: 打开视频播放器窗口**，把这个链接贴进去即可独立窗口观看：`);
-    body.push(`> \`${link.url}\``);
-    body.push("");
+    // 不再写「播放」提示块；来源链接放在 frontmatter 的 source，点击可触发播放（见 registerObsidianProtocolHandler / 点击拦截）
 
     if (meta.tagList && meta.tagList.length) {
       body.push("## 标签", "", meta.tagList.map((t) => `\`${t}\``).join(" "), "");
@@ -4386,8 +4444,12 @@ class VideoNoteStudio extends Plugin {
     await this.app.vault.process(file, (data) => {
       if (data.includes(canvasPath)) return data;
       const block = `> [!abstract] Canvas 拆解\n> ${link}`;
-      if (data.includes("> [!info] 播放")) return data.replace("> [!info] 播放", `${block}\n\n> [!info] 播放`);
-      return `${data.trimEnd()}\n\n${block}\n`;
+      const fmEnd = data.indexOf("\n---", 4);
+      if (data.startsWith("---") && fmEnd > 0) {
+        const at = fmEnd + 4;
+        return data.slice(0, at) + `\n${block}\n` + data.slice(at);
+      }
+      return `${block}\n\n${data.trimStart()}`;
     });
   }
 
