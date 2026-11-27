@@ -1,4 +1,5 @@
 const obsidian = require("obsidian");
+const { createDiv } = obsidian;
 const {
   Plugin, ItemView, WorkspaceLeaf, Notice, PluginSettingTab, Setting, Modal,
   FuzzySuggestModal, TFile, TFolder, TAbstractFile, normalizePath, requestUrl,
@@ -2324,6 +2325,16 @@ const BOOK_EXT = ["md", "txt", "epub"];
 
 function pad2(n) { return String(n).padStart(2, "0"); }
 
+/** B站 qn → 中文画质名 */
+function biliQualityLabel(qn) {
+  const map = {
+    127: "8K 超高清", 126: "杜比视界", 125: "HDR 真彩", 120: "4K 超清",
+    116: "1080P60 高帧率", 112: "1080P+ 高码率", 80: "1080P 高清",
+    74: "720P60 高帧率", 64: "720P 准高清", 32: "480P 清晰", 16: "360P 流畅", 6: "240P 极速",
+  };
+  return map[qn] || `画质 ${qn}`;
+}
+
 function fmtTime(sec) {
   sec = Math.max(0, Math.floor(sec || 0));
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
@@ -2538,8 +2549,8 @@ class VideoPlayerView extends ItemView {
   }
 
   async onClose() {
-    // registerDomEvent 注册的监听随组件销毁自动清理，这里只需停掉计时器
-    if (this.timer) clearInterval(this.timer);
+    this.destroyPlayerChrome();
+    this.hideQualityMenu();
   }
 
   onMessage(ev) {
@@ -2629,13 +2640,18 @@ class VideoPlayerView extends ItemView {
   }
 
   clearAll() {
+    this.destroyPlayerChrome();
+    this.hideQualityMenu();
     // 停掉正在播放的视频 / iframe
     if (this.videoEl) {
       try { this.videoEl.pause(); this.videoEl.removeAttribute("src"); this.videoEl.load(); } catch (e) { /* ignore */ }
       this.videoEl = null;
     }
+    if (this.audioEl) {
+      try { this.audioEl.pause(); this.audioEl.removeAttribute("src"); this.audioEl.load(); } catch (e) { /* ignore */ }
+      this.audioEl = null;
+    }
     if (this.iframeEl) { this.iframeEl.src = "about:blank"; this.iframeEl = null; }
-    if (this.timer) { clearInterval(this.timer); this.timer = null; }
 
     // 重置状态
     this.link = null;
@@ -2683,55 +2699,354 @@ class VideoPlayerView extends ItemView {
     this.notePath = null;
     this.lastKnownTime = 0;
     if (this.timer) clearInterval(this.timer);
+    this.destroyPlayerChrome();
     this.stage.empty();
     this.videoEl = null;
+    this.audioEl = null;
     this.iframeEl = null;
     this.setStatus("加载中…");
     this.updateMeta(link);
+    this.hideQualityMenu();
 
     if (link.kind === "file") {
       const f = link.file || this.app.vault.getAbstractFileByPath(normalizePath(link.url));
-      if (!(f instanceof TFile)) { this.stage.createDiv({ cls: "vns-empty", text: "文件不可读" }); this.setStatus("文件不可读"); return; }
-      this.videoEl = this.stage.createEl("video", { attr: { controls: "true", playsinline: "true" } });
-      this.videoEl.src = this.app.vault.getResourcePath(f);
-      this.urlInput.value = f.path;
-      this.videoEl.addEventListener("loadedmetadata", () => {
-        this.setStatus("就绪");
-        this.updateMeta(link);
-      });
-      this.videoEl.addEventListener("play", () => this.setStatus("播放中"));
-      this.videoEl.addEventListener("pause", () => this.setStatus("已暂停"));
-    } else {
-      const src = embedFor(link, startAt);
-      if (!src) {
-        if (link.kind === "direct") {
-          this.videoEl = this.stage.createEl("video", { attr: { controls: "true", playsinline: "true" } });
-          this.videoEl.src = link.url;
-          this.videoEl.addEventListener("play", () => this.setStatus("播放中"));
-          this.videoEl.addEventListener("pause", () => this.setStatus("已暂停"));
-        } else {
-          this.stage.createDiv({ cls: "vns-empty", text: `${link.kind} 类型的链接无法内嵌播放，可「生成笔记」后跳浏览器观看` });
-        }
-      } else {
-        this.iframeEl = this.stage.createEl("iframe", {
-          attr: { src, allow: "autoplay; fullscreen; picture-in-picture", allowfullscreen: "true", referrerpolicy: "no-referrer" },
-        });
+      if (!(f instanceof TFile)) {
+        this.stage.createDiv({ cls: "vns-empty", text: "文件不可读" });
+        this.setStatus("文件不可读");
+        return;
       }
-      this.urlInput.value = link.url;
+      this.urlInput.value = f.path;
+      this.mountNativePlayer(this.app.vault.getResourcePath(f), { startAt, title: link.title });
+      return;
     }
 
+    if (link.kind === "bilibili") {
+      this.urlInput.value = link.url;
+      this.loadBilibili(link, startAt);
+      return;
+    }
+
+    if (link.kind === "direct") {
+      this.urlInput.value = link.url;
+      this.mountNativePlayer(link.url, { startAt, title: link.title });
+      return;
+    }
+
+    const src = embedFor(link, startAt);
+    this.urlInput.value = link.url;
+    if (!src) {
+      this.stage.createDiv({ cls: "vns-empty", text: `${link.kind} 类型的链接无法内嵌播放，可「生成笔记」后跳浏览器观看` });
+      this.setStatus("不支持内嵌播放");
+      return;
+    }
+    this.mountIframe(src);
     this.setStatus("就绪");
+  }
+
+  /** B站：直链原生播放，失败自动回退 iframe */
+  async loadBilibili(link, startAt) {
+    try {
+      const stream = await this.plugin.resolveBiliStream(link);
+      this.biliStream = stream;
+      this.setStatus("已解析直链，正在加载…");
+      if (stream.mode === "dash") {
+        const pick = this.plugin.pickDashStream(stream, stream.current);
+        if (!pick.videoUrl) throw new Error("DASH 没有可用视频流");
+        this.mountNativePlayer(pick.videoUrl, {
+          startAt,
+          title: link.title,
+          audioSrc: pick.audioUrl,
+          qualities: stream.qualities,
+          currentQn: pick.qn,
+        });
+      } else {
+        const first = stream.durl[0];
+        if (!first || !first.url) throw new Error("没有可用播放地址");
+        this.mountNativePlayer(first.url, {
+          startAt,
+          title: link.title,
+          qualities: stream.qualities,
+          currentQn: stream.current,
+        });
+      }
+      this.setStatus("就绪");
+    } catch (e) {
+      console.debug("[vns] B站 直链失败，回退 iframe", e.message);
+      this.setStatus("直链失败，已回退内嵌播放器");
+      new Notice(`B站 直链解析失败，已回退到内嵌播放器：${e.message}`, 6000);
+      this.biliStream = null;
+      this.mountIframe(embedFor(link, startAt));
+    }
+  }
+
+  /** 切换 B站 画质 */
+  async switchBiliQuality(qn) {
+    if (!this.link || this.link.kind !== "bilibili") return;
+    this.hideQualityMenu();
+    const current = this.videoEl ? this.videoEl.currentTime : this.lastKnownTime;
+    const wasPlaying = this.videoEl ? !this.videoEl.paused : false;
+    try {
+      const stream = await this.plugin.resolveBiliStream(this.link, qn);
+      this.biliStream = stream;
+      if (stream.mode === "dash") {
+        const pick = this.plugin.pickDashStream(stream, qn);
+        if (!pick.videoUrl) throw new Error(`${biliQualityLabel(qn)} 没有可用流`);
+        this.mountNativePlayer(pick.videoUrl, {
+          startAt: current,
+          title: this.link.title,
+          audioSrc: pick.audioUrl,
+          qualities: stream.qualities,
+          currentQn: pick.qn,
+          autoplay: wasPlaying,
+        });
+      } else {
+        this.mountNativePlayer(stream.durl[0].url, {
+          startAt: current,
+          title: this.link.title,
+          qualities: stream.qualities,
+          currentQn: stream.current,
+          autoplay: wasPlaying,
+        });
+      }
+      this.setStatus(`已切换到 ${biliQualityLabel(qn)}`);
+    } catch (e) {
+      new Notice(`切换画质失败：${e.message}`, 6000);
+    }
+  }
+
+  mountIframe(src) {
+    if (!src) return;
+    this.iframeEl = this.stage.createEl("iframe", {
+      attr: { src, allow: "autoplay; fullscreen; picture-in-picture", allowfullscreen: "true", referrerpolicy: "no-referrer" },
+    });
     this.timer = setInterval(() => this.tick(), 500);
     this.updateClock();
   }
 
+  /** 原生播放器：视频 + 可选独立音轨（DASH）+ 自绘控制条 */
+  mountNativePlayer(videoSrc, opts) {
+    opts = opts || {};
+    this.destroyPlayerChrome();
+
+    const wrap = this.stage.createDiv({ cls: "vns-player" });
+
+    this.videoEl = wrap.createEl("video", { cls: "vns-video", attr: { playsinline: "true", preload: "metadata" } });
+    this.videoEl.src = videoSrc;
+    if (opts.title) this.videoEl.title = opts.title;
+
+    // DASH 音轨单独播放，与视频同步
+    if (opts.audioSrc) {
+      this.audioEl = wrap.createEl("audio", { cls: "vns-audio", attr: { preload: "auto" } });
+      this.audioEl.src = opts.audioSrc;
+    }
+
+    // 中央加载/重试提示
+    this.playerMsg = wrap.createDiv({ cls: "vns-player-msg is-hidden" });
+
+    // ---- 控制条 ----
+    const bar = wrap.createDiv({ cls: "vns-ctl" });
+
+    // 进度条
+    const progRow = bar.createDiv({ cls: "vns-ctl-progress" });
+    this.progFill = progRow.createDiv({ cls: "vns-ctl-progress-fill" });
+    this.progBuf = progRow.createDiv({ cls: "vns-ctl-progress-buffer" });
+    this.progTrack = progRow;
+
+    // 按钮行
+    const row = bar.createDiv({ cls: "vns-ctl-row" });
+    const mkBtn = (parent, cls, label, title, fn) => {
+      const b = parent.createEl("button", { cls: `vns-ctl-btn ${cls || ""}`, text: label });
+      if (title) b.title = title;
+      b.addEventListener("click", (ev) => { ev.preventDefault(); fn(); });
+      return b;
+    };
+
+    this.playBtn = mkBtn(row, "vns-ctl-play", "▶", "播放 / 暂停", () => this.togglePlay());
+    this.ctlTime = row.createSpan({ cls: "vns-ctl-time", text: "0:00 / 0:00" });
+    row.createDiv({ cls: "vns-ctl-spacer" });
+
+    // 倍速
+    this.rateBtn = mkBtn(row, "vns-ctl-rate", "1.0x", "播放速度", () => this.cycleRate());
+    // 画质
+    if (opts.qualities && opts.qualities.length) {
+      this.qualityBtn = mkBtn(row, "vns-ctl-quality", biliQualityLabel(opts.currentQn) || "画质", "切换画质", () => this.showQualityMenu(opts.qualities, opts.currentQn));
+    }
+    // 音量
+    const volWrap = row.createDiv({ cls: "vns-ctl-vol" });
+    this.muteBtn = mkBtn(volWrap, "vns-ctl-mute", "🔊", "静音", () => this.toggleMute());
+    this.volSlider = volWrap.createEl("input", { cls: "vns-ctl-vol-slider", attr: { type: "range", min: "0", max: "100", value: "100" } });
+    this.volSlider.addEventListener("input", () => this.setVolume(Number(this.volSlider.value) / 100));
+    // 全屏
+    mkBtn(row, "vns-ctl-fs", "⛶", "全屏", () => this.toggleFullscreen(wrap));
+
+    // ---- 交互 ----
+    this.videoEl.addEventListener("loadedmetadata", () => {
+      if (opts.startAt > 0) this.seek(opts.startAt);
+      this.updateClock();
+      this.setStatus("就绪");
+    });
+    this.videoEl.addEventListener("error", () => {
+      this.showPlayerMsg("视频加载失败（直链可能已过期），点此重试", () => {
+        if (this.link && this.link.kind === "bilibili") this.loadBilibili(this.link, this.currentTime());
+        else this.mountNativePlayer(videoSrc, opts);
+      });
+      this.setStatus("加载失败");
+      if (this.link && this.link.kind === "bilibili" && this.biliStream) {
+        // 直链过期 → 回退 iframe
+        new Notice("B站 直链已过期，已回退内嵌播放器", 6000);
+        this.mountIframe(embedFor(this.link, this.currentTime()));
+      }
+    });
+    this.videoEl.addEventListener("play", () => { this.playBtn.setText("⏸"); this.setStatus("播放中"); this.syncAudio(); });
+    this.videoEl.addEventListener("pause", () => { this.playBtn.setText("▶"); this.setStatus("已暂停"); this.syncAudio(); });
+    this.videoEl.addEventListener("durationchange", () => this.updateClock());
+    this.videoEl.addEventListener("timeupdate", () => this.renderProgress());
+    this.videoEl.addEventListener("progress", () => this.renderProgress());
+    this.videoEl.addEventListener("click", () => this.togglePlay());
+    this.videoEl.addEventListener("dblclick", () => this.toggleFullscreen(wrap));
+
+    // 进度条点击/拖拽
+    let dragging = false;
+    const seekFromEvent = (ev) => {
+      const rect = this.progTrack.getBoundingClientRect();
+      const ratio = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+      if (isFinite(this.videoEl.duration)) this.seek(ratio * this.videoEl.duration);
+    };
+    this.progTrack.addEventListener("mousedown", (ev) => { dragging = true; seekFromEvent(ev); });
+    window.addEventListener("mousemove", (ev) => { if (dragging) seekFromEvent(ev); });
+    window.addEventListener("mouseup", () => { dragging = false; });
+
+    // 键盘快捷键（仅当焦点在播放器内）
+    this.videoEl.tabIndex = 0;
+    this.videoEl.addEventListener("keydown", (ev) => {
+      if (ev.key === " ") { ev.preventDefault(); this.togglePlay(); }
+      else if (ev.key === "ArrowRight") { ev.preventDefault(); this.seek(this.currentTime() + 5); }
+      else if (ev.key === "ArrowLeft") { ev.preventDefault(); this.seek(this.currentTime() - 5); }
+      else if (ev.key === "f") { this.toggleFullscreen(wrap); }
+    });
+
+    this.setVolume(Number(this.volSlider.value) / 100);
+    if (opts.autoplay) { this.videoEl.play().catch(() => {}); }
+    this.timer = setInterval(() => this.tick(), 500);
+    this.renderProgress();
+    this.updateClock();
+  }
+
+  destroyPlayerChrome() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    if (this.videoEl) { try { this.videoEl.pause(); } catch (e) { /* ignore */ } }
+    if (this.audioEl) { try { this.audioEl.pause(); } catch (e) { /* ignore */ } }
+    if (this.qualityMenu) { this.qualityMenu.remove(); this.qualityMenu = null; }
+  }
+
+  showPlayerMsg(text, onClick) {
+    if (!this.playerMsg) return;
+    this.playerMsg.setText(text);
+    this.playerMsg.removeClass("is-hidden");
+    this.playerMsg.onclick = () => { this.playerMsg.addClass("is-hidden"); if (onClick) onClick(); };
+  }
+
+  hidePlayerMsg() { if (this.playerMsg) this.playerMsg.addClass("is-hidden"); }
+
+  togglePlay() {
+    if (!this.videoEl) return;
+    if (this.videoEl.paused) this.videoEl.play().catch((e) => this.showPlayerMsg(`播放失败：${e.message}`));
+    else this.videoEl.pause();
+  }
+
+  syncAudio() {
+    if (!this.audioEl || !this.videoEl) return;
+    if (Math.abs((this.audioEl.currentTime || 0) - (this.videoEl.currentTime || 0)) > 0.3) {
+      this.audioEl.currentTime = this.videoEl.currentTime || 0;
+    }
+    if (this.videoEl.paused) this.audioEl.pause();
+    else this.audioEl.play().catch(() => {});
+  }
+
+  toggleMute() {
+    if (!this.videoEl) return;
+    const muted = !this.videoEl.muted;
+    this.videoEl.muted = muted;
+    if (this.audioEl) this.audioEl.muted = muted;
+    this.muteBtn.setText(muted ? "🔇" : "🔊");
+  }
+
+  setVolume(v) {
+    const vol = Math.min(1, Math.max(0, v));
+    if (this.videoEl) this.videoEl.volume = vol;
+    if (this.audioEl) this.audioEl.volume = vol;
+  }
+
+  cycleRate() {
+    const rates = [1, 1.25, 1.5, 2, 0.75];
+    const cur = this.videoEl ? this.videoEl.playbackRate : 1;
+    const idx = rates.findIndex((r) => Math.abs(r - cur) < 0.01);
+    const next = rates[(idx + 1) % rates.length];
+    if (this.videoEl) this.videoEl.playbackRate = next;
+    if (this.audioEl) this.audioEl.playbackRate = next;
+    if (this.rateBtn) this.rateBtn.setText(`${next.toFixed(next % 1 === 0 ? 1 : 2)}x`);
+  }
+
+  toggleFullscreen(el) {
+    const target = el || this.stage;
+    if (document.fullscreenElement) document.exitFullscreen();
+    else target.requestFullscreen && target.requestFullscreen();
+  }
+
+  showQualityMenu(qualities, currentQn) {
+    this.hideQualityMenu();
+    const menu = createDiv({ cls: "vns-quality-menu" });
+    for (const q of qualities) {
+      const item = menu.createDiv({
+        cls: `vns-quality-item ${q.qn === currentQn ? "is-current" : ""} ${q.available === false ? "is-locked" : ""}`,
+        text: q.available === false ? `${q.label} （需登录/会员）` : q.label,
+      });
+      item.addEventListener("click", () => {
+        if (q.available === false) { new Notice(`「${q.label}」需要登录对应账号或更高权限`, 5000); return; }
+        this.switchBiliQuality(q.qn);
+      });
+      menu.appendChild(item);
+    }
+    this.qualityMenu = menu;
+    document.body.appendChild(menu);
+    const rect = this.qualityBtn.getBoundingClientRect();
+    menu.style.left = `${rect.left}px`;
+    menu.style.top = `${Math.max(8, rect.top - menu.offsetHeight - 8)}px`;
+  }
+
+  hideQualityMenu() {
+    if (this.qualityMenu) { this.qualityMenu.remove(); this.qualityMenu = null; }
+  }
+
+  renderProgress() {
+    if (!this.videoEl || !this.progFill) return;
+    const dur = this.videoEl.duration || this.link && this.link.duration || 0;
+    const cur = this.videoEl.currentTime || 0;
+    const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
+    this.progFill.style.width = `${pct}%`;
+    try {
+      if (this.videoEl.buffered && this.videoEl.buffered.length) {
+        const bufEnd = this.videoEl.buffered.end(this.videoEl.buffered.length - 1);
+        this.progBuf.style.width = dur > 0 ? `${Math.min(100, (bufEnd / dur) * 100)}%` : "0%";
+      }
+    } catch (e) { /* ignore */ }
+    if (this.ctlTime) {
+      this.ctlTime.setText(`${fmtTime(cur)} / ${dur && !isNaN(dur) ? fmtTime(dur) : "0:00"}`);
+    }
+  }
+
   seek(sec) {
-    const s = Math.max(0, Math.floor(sec || 0));
+    const s = Math.max(0, sec || 0);
     if (!this.link) return;
     this.lastKnownTime = s;
     if (this.videoEl) {
-      try { this.videoEl.currentTime = s; this.videoEl.play().catch(() => {}); } catch (e) { /* ignore */ }
+      try {
+        this.videoEl.currentTime = s;
+        if (this.audioEl) this.audioEl.currentTime = s;
+        this.videoEl.play().catch(() => {});
+      } catch (e) { /* ignore */ }
       this.updateClock();
+      this.renderProgress();
       return;
     }
     if (this.iframeEl) {
@@ -2739,21 +3054,22 @@ class VideoPlayerView extends ItemView {
         this.iframeEl.contentWindow.postMessage(
           JSON.stringify({ event: "command", func: "seekTo", args: [s, true] }), "*");
       } else if (this.link.kind === "bilibili") {
-        // B站 播放器不对外暴露 seek 接口，只能带 t 参数重载
         this.iframeEl.src = embedFor(this.link, s);
       }
     }
   }
 
   tick() {
-    if (this.videoEl) { this.lastKnownTime = this.videoEl.currentTime || 0; }
-    else if (this.iframeEl && this.link && this.link.kind === "youtube") {
+    if (this.videoEl) {
+      this.lastKnownTime = this.videoEl.currentTime || 0;
+      if (this.audioEl && !this.videoEl.paused) this.syncAudio();
+    } else if (this.iframeEl && this.link && this.link.kind === "youtube") {
       try {
         this.iframeEl.contentWindow.postMessage(
           JSON.stringify({ event: "command", func: "getCurrentTime", args: [] }), "*");
       } catch (e) { /* 跨域忽略 */ }
     } else if (this.iframeEl) {
-      this.lastKnownTime += 0.5; // B站 iframe 不暴露进度，用计时器近似
+      this.lastKnownTime += 0.5;
     }
     this.updateClock();
   }
@@ -3299,6 +3615,7 @@ class VideoNoteStudio extends Plugin {
 
     this.registerView(VIEW_TYPE_PLAYER, (leaf) => new VideoPlayerView(leaf, this));
     this.registerObsidianProtocolHandler("vns", (params) => this.handleVnsProtocol(params));
+    this.setupBiliReferer();
     this.bridgePath = this.resolveBridgePath();
     this.addRibbonIcon("play-circle", "打开视频播放器", () => this.openPlayer());
     this.addSettingTab(new VnsSettingTab(this.app, this));
@@ -3479,6 +3796,30 @@ class VideoNoteStudio extends Plugin {
     return (data.data || []).map((m) => m.id).filter(Boolean).sort();
   }
 
+  /** B站 CDN 校验 Referer，必须给直链请求补上，否则 403 */
+  setupBiliReferer() {
+    try {
+      const electron = require("electron");
+      const session = electron.remote && electron.remote.session
+        ? electron.remote.session.defaultSession
+        : (electron.session && electron.session.defaultSession);
+      if (!session || !session.webRequest) {
+        console.debug("[vns] 没有 webRequest 权限，B站 直链可能 403");
+        return;
+      }
+      const filter = { urls: ["*://*.bilivideo.com/*", "*://*.bilivideo.cn/*", "*://*.akamaized.net/*", "*://*.mcdn.bilivideo.com/*"] };
+      session.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+        const h = details.requestHeaders || {};
+        h["Referer"] = "https://www.bilibili.com/";
+        h["Origin"] = "https://www.bilibili.com";
+        callback({ requestHeaders: h });
+      });
+      this._biliRefererInstalled = true;
+    } catch (e) {
+      console.debug("[vns] 安装 B站 Referer 失败", e.message);
+    }
+  }
+
   hasBiliLogin() { return !!(this.settings.biliCookies && this.settings.biliCookies.SESSDATA); }
 
   biliCookieHeader() {
@@ -3604,6 +3945,103 @@ class VideoNoteStudio extends Plugin {
       meta.error = e.message;
     }
     return meta;
+  }
+
+  /* ---------- B站 直链播放 ---------- */
+
+  /**
+   * 通过 playurl API 解析 B站 视频直链。
+   * 优先 DASH（画质最高，音视频分离），拿不到时退回 durl 单文件 MP4。
+   */
+  async resolveBiliStream(link, preferQn) {
+    const cid = link.cid || await (async () => {
+      const j = await this.requestJson(`https://api.bilibili.com/x/web-interface/view?bvid=${link.id}`, this.biliHeaders());
+      return j && j.data ? j.data.cid : null;
+    })();
+    if (!cid) throw new Error("拿不到 cid，无法解析直链");
+    link.cid = cid;
+
+    const qn = preferQn || 80;
+    const buildUrl = (fnval, useQn) =>
+      `https://api.bilibili.com/x/player/playurl?bvid=${link.id}&cid=${cid}`
+      + `${link.page > 1 ? `&page=${link.page}` : ""}`
+      + `&qn=${useQn}&fnval=${fnval}&fourk=1&high_quality=1`;
+
+    let dash = null;
+    try {
+      const j = await this.requestJson(buildUrl(4048, qn), this.biliHeaders());
+      if (j.code === 0 && j.data && j.data.dash && Array.isArray(j.data.dash.video) && j.data.dash.video.length) {
+        dash = j.data;
+      }
+    } catch (e) { console.debug("[vns] DASH 解析失败", e.message); }
+
+    if (dash) {
+      // 优先 avc1（兼容性最好，Electron 能直接解），同画质下取码率最高的
+      const byQn = new Map();
+      for (const v of dash.video) {
+        const prev = byQn.get(v.id);
+        const isAvc = /^avc1/i.test(v.codecs || "");
+        const prevAvc = prev && /^avc1/i.test(prev.codecs || "");
+        if (!prev || (isAvc && !prevAvc) || (isAvc === prevAvc && (v.bandwidth || 0) > (prev.bandwidth || 0))) {
+          byQn.set(v.id, v);
+        }
+      }
+      // 画质选项：以 accept_quality + accept_description 为准（含当前账号不可用的档位，标灰）
+      const available = new Set([...byQn.keys()]);
+      const descs = dash.accept_description || [];
+      const acq = dash.accept_quality || [];
+      const qualities = acq.map((q, i) => ({
+        qn: q,
+        label: descs[i] || biliQualityLabel(q),
+        available: available.has(q),
+      }));
+      if (!qualities.length) {
+        for (const [q] of byQn) qualities.push({ qn: q, label: biliQualityLabel(q), available: true });
+      }
+      return {
+        mode: "dash", dash, streams: byQn,
+        qualities: qualities.sort((a, b) => b.qn - a.qn),
+        accept: acq,
+        current: dash.quality,
+        duration: dash.duration || 0,
+      };
+    }
+
+    const j2 = await this.requestJson(buildUrl(0, qn), this.biliHeaders());
+    if (j2.code !== 0 || !j2.data || !j2.data.durl || !j2.data.durl.length) {
+      throw new Error(j2.message || "playurl 没有返回可播放流");
+    }
+    const durl = j2.data.durl;
+    return {
+      mode: "durl",
+      durl,
+      qualities: (j2.data.support_formats || []).map((f) => ({ qn: f.quality, label: f.new_description || biliQualityLabel(f.quality) }))
+        .sort((a, b) => b.qn - a.qn),
+      accept: j2.data.accept_quality || [],
+      current: j2.data.quality,
+      duration: durl.reduce((s, d) => s + (d.length || 0), 0),
+    };
+  }
+
+  /** 从已解析的 DASH 结果里挑出目标画质的音视频流地址 */
+  pickDashStream(stream, wantedQn) {
+    const dash = stream.dash || {};
+    const streams = stream.streams || new Map();
+    const audios = (dash.audio || []).slice().sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0));
+    let video = streams.get(wantedQn);
+    if (!video) {
+      // 目标画质不可用 → 降级到有流的最低档
+      const keys = [...streams.keys()].sort((a, b) => b - a);
+      video = keys.length ? streams.get(keys[0]) : null;
+    }
+    const audio = audios[0];
+    return {
+      videoUrl: video ? (video.baseUrl || video.base_url) : "",
+      audioUrl: audio ? (audio.baseUrl || audio.base_url) : "",
+      width: video ? video.width : 0,
+      height: video ? video.height : 0,
+      qn: video ? video.id : 0,
+    };
   }
 
   async fetchTranscript(link) {
