@@ -78,129 +78,6 @@
   color: var(--text-normal);
 }
 
-/* 元信息 */
-.vns-meta {
-  flex: 1; min-width: 0;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.vns-meta-placeholder {
-  font-size: 12px; color: var(--text-faint); font-style: italic;
-}
-.vns-meta-title {
-  font-size: 13px; font-weight: 600; color: var(--text-normal);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.vns-meta-sub {
-  font-size: 11px; color: var(--text-muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-/* B站扫码登录 */
-.vns-login-modal { text-align: center; padding: 8px 20px 20px; }
-.vns-login-qr { display: flex; justify-content: center; margin: 14px 0; min-height: 220px; }
-.vns-login-qr svg { width: 220px; height: 220px; background: #fff; border-radius: 10px; }
-.vns-login-status { font-size: 13px; color: var(--text-normal); margin-top: 8px; }
-.vns-login-account { font-size: 15px; font-weight: 600; margin: 14px 0 8px; }
-.vns-login-actions { display: flex; justify-content: center; gap: 8px; margin-top: 18px; }
-.vns-login-error { color: var(--text-error); font-size: 13px; margin: 14px 0; overflow-wrap: anywhere; }
-
-/* 视频信息：贴在播放器下方，一行内左对齐，仅在播放时出现 */
-.vns-meta-inline {
-  display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 8px;
-  padding: 8px 16px 0;
-  min-height: 0;
-}
-.vns-meta-inline .vns-meta-title {
-  font-size: 13px; font-weight: 600;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  min-width: 0;
-}
-.vns-meta-inline .vns-meta-sub {
-  font-size: 11px; color: var(--text-muted);
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-/* 未登录时才出现的 B站登录小按钮 */
-.vns-login-inline {
-  position: absolute;
-  right: 16px;
-  bottom: 8px;
-  font-size: 11px;
-  padding: 2px 8px;
-  opacity: 0.75;
-  z-index: 4;
-}
-.vns-login-inline:hover { opacity: 1; }
-
-/* 播放器下方的操作条 */
-.vns-actionbar {
-  display: flex; align-items: center; gap: 6px;
-  padding: 8px 16px;
-  background: var(--background-secondary);
-  border-top: 1px solid var(--background-modifier-border);
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
-.vns-actionbar-spacer { flex: 1; }
-
-/* ── 播放器舞台 ── */
-/* 方案 A+B：舞台按 16:9 贴合视频尺寸，多余空间用面板底色（非纯黑）填充 */
-.vns-stage-wrap {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 0;
-  background: var(--background-primary);
-  overflow: auto;
-}
-.vns-stage {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  max-height: 100%;
-  overflow: hidden;
-  background: var(--background-primary);
-  border-radius: 0;
-}
-.vns-stage video, .vns-stage iframe, .vns-stage .vns-player {
-  position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
-}
-/* 有播放器时背景保持纯黑（视频本体区域） */
-.vns-stage:has(video), .vns-stage:has(iframe) {
-  background: #000;
-}
-.vns-empty {
-  display: flex; align-items: center; justify-content: center;
-  height: 100%;
-  color: var(--text-faint); font-size: 13px;
-  background: var(--background-primary);
-}
-/* 画质菜单等浮层不受影响 */
-.vns-quality-menu { position: fixed; }
-
-/* ── 底部状态栏 ── */
-.vns-statusbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 16px;
-  background: var(--background-secondary);
-  border-top: 1px solid var(--background-modifier-border);
-  font-size: 12px;
-}
-.vns-time {
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  font-weight: 500;
-  letter-spacing: 0.3px;
-}
-.vns-status {
-  font-size: 11px; color: var(--text-faint);
-}
-
 /* ── 原生播放器（自绘控制条） ── */
 .vns-player {
   position: absolute; inset: 0;
@@ -345,9 +222,6 @@
   .vns-input-row { flex-direction: column; align-items: stretch; }
   .vns-btn-group { justify-content: flex-end; }
   .vns-actionbar { padding: 6px 12px; }
-  .vns-meta { flex-direction: row; gap: 8px; align-items: center; }
-  .vns-meta-title { flex: 1; min-width: 0; }
-  .vns-meta-sub { flex-shrink: 0; }
   .vns-toolbar { padding: 10px 12px; }
   .vns-statusbar { padding: 5px 12px; }
 }
