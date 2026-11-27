@@ -2622,7 +2622,8 @@ class VideoPlayerView extends ItemView {
       () => this.openBiliLogin(), "is-ghost vns-login-btn");
     this.biliLoginBtn.title = "扫码登录后，播放器使用你的账号清晰度（具体画质取决于视频与账号权限）";
 
-    this.stage = root.createDiv({ cls: "vns-stage" });
+    this.stageWrap = root.createDiv({ cls: "vns-stage-wrap" });
+    this.stage = this.stageWrap.createDiv({ cls: "vns-stage" });
     this.stage.createDiv({ cls: "vns-empty", text: "粘贴链接或选择本地视频开始" });
 
     const statusBar = root.createDiv({ cls: "vns-statusbar" });
