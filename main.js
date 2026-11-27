@@ -2633,9 +2633,7 @@ class VideoPlayerView extends ItemView {
     actionBtn("生成笔记", () => this.plugin.importLink(this.link ? this.link.url : this.urlInput.value, { player: this }));
     actionBtn("生成 Canvas", () => this.generateCanvas());
 
-    const statusBar = root.createDiv({ cls: "vns-statusbar" });
-    this.clockEl = statusBar.createEl("span", { cls: "vns-time", text: "0:00 / 0:00" });
-    this.statusEl = statusBar.createEl("span", { cls: "vns-status", text: "就绪" });
+    // 底部状态栏已移除（用户不需要时间显示）
   }
 
   /** 同步 B站登录按钮显隐：已登录时完全隐藏，不打扰 */
@@ -2658,7 +2656,8 @@ class VideoPlayerView extends ItemView {
   }
 
   setStatus(text) {
-    if (this.statusEl) this.statusEl.setText(text || "");
+    // 状态栏已移除，仅写日志便于排查
+    console.debug("[vns]", text);
   }
 
   clearAll() {
@@ -3101,12 +3100,7 @@ class VideoPlayerView extends ItemView {
   }
 
   updateClock() {
-    if (!this.clockEl) return;
-    const t = this.currentTime();
-    const dur = this.videoEl ? this.videoEl.duration : (this.link ? this.link.duration || 0 : 0);
-    const tStr = fmtTime(t);
-    const dStr = dur && !isNaN(dur) ? fmtTime(dur) : "";
-    this.clockEl.textContent = dStr ? `${tStr} / ${dStr}` : tStr;
+    // 底部状态栏已移除；此方法保留为空，兼容内部调用点
   }
 
   currentTime() {
