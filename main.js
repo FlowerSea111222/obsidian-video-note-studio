@@ -2606,18 +2606,22 @@ class VideoPlayerView extends ItemView {
     btn(sourceBtns, "本地", () => this.plugin.pickLocalVideo((f) => this.loadFile(f)));
     btn(sourceBtns, "清除", () => this.clearAll(), "is-ghost");
 
-    // 信息与账号状态
-    const metaRow = toolbar.createDiv({ cls: "vns-meta-row" });
-    this.metaEl = metaRow.createDiv({ cls: "vns-meta" });
-    this.updateMeta(null);
-    this.biliLoginBtn = btn(metaRow, this.plugin.settings.biliCookies && Object.keys(this.plugin.settings.biliCookies).length ? "B站已登录" : "B站登录",
-      () => this.openBiliLogin(), "is-ghost vns-login-btn");
-    this.biliLoginBtn.title = "扫码登录后，播放器使用你的账号清晰度（具体画质取决于视频与账号权限）";
-
-    // ─── 播放器（紧贴输入区下方，尽量上移）───
+    // 播放器（紧贴输入区下方，尽量上移）——视频标题等信息改为贴在播放器下方，不再单独占一行
     this.stageWrap = root.createDiv({ cls: "vns-stage-wrap" });
     this.stage = this.stageWrap.createDiv({ cls: "vns-stage" });
     this.stage.createDiv({ cls: "vns-empty", text: "粘贴链接或选择本地视频开始" });
+
+    // 视频信息（仅在播放时显示，不常驻）
+    this.metaEl = root.createDiv({ cls: "vns-meta vns-meta-inline" });
+    this.metaEl.style.display = "none";
+    // B站登录按钮仅在未登录时提示；已登录不显示
+    this.biliLoginBtn = root.createEl("button", {
+      cls: "vns-btn is-ghost vns-login-inline",
+      text: "B站登录",
+    });
+    this.biliLoginBtn.title = "扫码登录后，播放器使用你的账号清晰度（具体画质取决于视频与账号权限）";
+    this.biliLoginBtn.addEventListener("click", () => this.openBiliLogin());
+    this._syncBiliLoginBtn();
 
     // ─── 播放器下方：操作按钮行 ───
     this.actionBar = root.createDiv({ cls: "vns-actionbar" });
@@ -2637,24 +2641,34 @@ class VideoPlayerView extends ItemView {
     this.statusEl = statusBar.createEl("span", { cls: "vns-status", text: "就绪" });
   }
 
+  /** 同步 B站登录按钮显隐：已登录时完全隐藏，不打扰 */
+  _syncBiliLoginBtn() {
+    if (!this.biliLoginBtn) return;
+    const logged = !!(this.plugin.settings.biliCookies && Object.keys(this.plugin.settings.biliCookies).length);
+    this.biliLoginBtn.style.display = logged ? "none" : "";
+  }
+
   updateMeta(link) {
     if (!this.metaEl) return;
     this.metaEl.empty();
-    if (!link) {
-      this.metaEl.createSpan({ cls: "vns-meta-placeholder", text: "暂无视频" });
+    if (!link || (!link.title && !link.author)) {
+      this.metaEl.style.display = "none";
+      this._syncBiliLoginBtn();
       return;
     }
+    this.metaEl.style.display = "";
     if (link.title) this.metaEl.createSpan({ cls: "vns-meta-title", text: link.title });
     const metaItems = [];
     if (link.author) metaItems.push(link.author);
     if (link.duration) metaItems.push(fmtTime(link.duration));
     if (link.published) metaItems.push(link.published);
     if (metaItems.length) this.metaEl.createSpan({ cls: "vns-meta-sub", text: metaItems.join(" · ") });
+    this._syncBiliLoginBtn();
   }
 
   openBiliLogin() {
     new BiliLoginModal(this.app, this.plugin, async (loggedIn) => {
-      if (this.biliLoginBtn) this.biliLoginBtn.setText(loggedIn ? "B站已登录" : "B站登录");
+      this._syncBiliLoginBtn();
       if (loggedIn && this.link && this.link.kind === "bilibili") this.attach(this.link, this.currentTime());
     }).open();
   }
