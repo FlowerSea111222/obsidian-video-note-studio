@@ -4342,7 +4342,6 @@ class VideoNoteStudio extends Plugin {
       body.push("");
       body.push(meta.description ? "简介已写在上面，其余只有链接与元数据。" : "只能记录链接与元数据。");
     }
-    body.push("", "## 原文", "", link.url, "");
     return fm.join("\n") + body.join("\n");
   }
 
