@@ -123,13 +123,32 @@
 .vns-login-error { color: var(--text-error); font-size: 13px; margin: 14px 0; overflow-wrap: anywhere; }
 
 /* ── 播放器舞台 ── */
+/* 方案 A+B：舞台按 16:9 贴合视频尺寸，多余空间用面板底色（非纯黑）填充 */
+.vns-stage-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0;
+  background: var(--background-primary);
+  overflow: auto;
+}
 .vns-stage {
-  flex: 1 1 auto; position: relative; overflow: hidden;
-  background: #000;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 100%;
+  overflow: hidden;
+  background: var(--background-primary);
   border-radius: 0;
 }
-.vns-stage video, .vns-stage iframe {
+.vns-stage video, .vns-stage iframe, .vns-stage .vns-player {
   position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
+}
+/* 有播放器时背景保持纯黑（视频本体区域） */
+.vns-stage:has(video), .vns-stage:has(iframe) {
+  background: #000;
 }
 .vns-empty {
   display: flex; align-items: center; justify-content: center;
@@ -137,6 +156,8 @@
   color: var(--text-faint); font-size: 13px;
   background: var(--background-primary);
 }
+/* 画质菜单等浮层不受影响 */
+.vns-quality-menu { position: fixed; }
 
 /* ── 底部状态栏 ── */
 .vns-statusbar {
