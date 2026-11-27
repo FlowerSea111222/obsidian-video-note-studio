@@ -2512,6 +2512,7 @@ const DEFAULT_SETTINGS = {
   ytDlpPath: "yt-dlp",
   asrEnabled: true,
   biliNative: false,
+  autoOpenPlayerOnNote: true,
   biliNativeQn: 80,
   pythonPath: "python",
   asrModel: "small",
@@ -3245,6 +3246,7 @@ class VnsSettingTab extends PluginSettingTab {
         } catch (e) { new Notice(`诊断失败：${e.message}`, 15000); }
         finally { b.setDisabled(false); }
       }));
+    toggle("打开笔记时自动打开播放器", "autoOpenPlayerOnNote", "打开带 source 视频链接的笔记时，自动在播放器里加载该视频（不抢焦点）");
     toggle("B站 使用原生播放器（实验）", "biliNative", "走 playurl 直链 + 自绘控制条；失败会自动回退内嵌播放器。目前部分环境解析不通，默认关闭");
     new Setting(containerEl).setName("测试本地转录").setDesc("检查 Python、faster-whisper 与 asr_bridge.py 是否就位")
       .addButton((b) => b.setButtonText("运行测试").onClick(async () => {
@@ -3692,6 +3694,9 @@ class VideoNoteStudio extends Plugin {
     this.setupBiliReferer();
     this.bridgePath = this.resolveBridgePath();
     this.registerSourceClick();
+    this.registerEvent(this.app.workspace.on("file-open", (file) => {
+      this.maybeAutoOpenPlayer(file).catch((e) => console.debug("[vns] 自动打开播放器失败", e));
+    }));
     this.addRibbonIcon("play-circle", "打开视频播放器", () => this.openPlayer());
     this.addSettingTab(new VnsSettingTab(this.app, this));
 
@@ -3781,15 +3786,34 @@ class VideoNoteStudio extends Plugin {
   }
 
   /* ---------- 播放器 ---------- */
-  async openPlayer() {
+  async openPlayer(silent) {
     let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_PLAYER)[0];
     if (!leaf) {
       const mode = this.settings.playerSplit === "window" ? "window" : this.settings.playerSplit === "tab" ? "tab" : "split";
       leaf = this.app.workspace.getLeaf(mode);
-      await leaf.setViewState({ type: VIEW_TYPE_PLAYER, active: true });
+      await leaf.setViewState({ type: VIEW_TYPE_PLAYER, active: !silent });
     }
-    this.app.workspace.revealLeaf(leaf);
+    if (!silent) this.app.workspace.revealLeaf(leaf);
     return leaf;
+  }
+
+  /** 打开笔记时自动加载对应视频（笔记绑定播放器） */
+  async maybeAutoOpenPlayer(file) {
+    if (!this.settings.autoOpenPlayerOnNote) return;
+    if (!(file instanceof TFile) || file.extension !== "md") return;
+    let fm = null;
+    try {
+      const cache = this.app.metadataCache.getFileCache(file);
+      fm = cache && cache.frontmatter;
+    } catch (e) { /* ignore */ }
+    const raw = fm && (fm.source || fm.Source || fm.url);
+    const url = raw ? this.resolveVideoUrl(String(raw)) : null;
+    if (!url) return;
+    // 同一篇笔记 + 同一视频只自动加载一次，避免来回切标签页时反复重载
+    if (this._autoOpenedFor === file.path && this._autoOpenedUrl === url) return;
+    this._autoOpenedFor = file.path;
+    this._autoOpenedUrl = url;
+    await this.playVideoUrl(url, { silent: true });
   }
 
   /** 设置页「测试直链」：把 B站 解析链路每步结果都报出来 */
@@ -3884,13 +3908,14 @@ class VideoNoteStudio extends Plugin {
   }
 
   /** 用播放器 leaf 打开并播放给定链接 */
-  async playVideoUrl(url) {
-    const leaf = await this.openPlayer();
+  async playVideoUrl(url, opts) {
+    opts = opts || {};
+    const leaf = await this.openPlayer(opts.silent);
     const view = leaf && leaf.view;
-    if (view instanceof VideoPlayerView) {
-      if (view.urlInput) view.urlInput.value = url;
-      await view.load(url);
-    }
+    if (!(view instanceof VideoPlayerView)) return;
+    if (view.link && view.link.url === url && view.videoEl) return;
+    if (view.urlInput) view.urlInput.value = url;
+    await view.load(url);
   }
 
   async handleVnsProtocol(params) {
