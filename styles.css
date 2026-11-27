@@ -278,26 +278,6 @@
   background: var(--interactive-accent-hover);
 }
 
-/* 底部状态栏 */
-.vns-statusbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 16px;
-  background: var(--background-secondary);
-  border-top: 1px solid var(--background-modifier-border);
-  font-size: 12px;
-  flex-shrink: 0;
-}
-.vns-time {
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  font-weight: 500;
-  letter-spacing: 0.3px;
-}
-.vns-status {
-  font-size: 11px; color: var(--text-faint);
-  margin-left: 8px;
-}
-
 /* 未登录时才出现的 B站登录小按钮 */
 .vns-login-inline {
   position: absolute;
@@ -321,5 +301,4 @@
   .vns-btn-group { justify-content: flex-end; }
   .vns-actionbar { padding: 6px 12px; }
   .vns-toolbar { padding: 10px 12px; }
-  .vns-statusbar { padding: 5px 12px; }
 }
