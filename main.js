@@ -2773,7 +2773,11 @@ class VideoPlayerView extends ItemView {
     } catch (e) {
       console.debug("[vns] B站 直链失败，回退 iframe", e.message);
       this.setStatus("直链失败，已回退内嵌播放器");
-      new Notice(`B站 直链解析失败，已回退到内嵌播放器：${e.message}`, 6000);
+      if (!this.plugin._biliRefererOk) {
+        new Notice(`B站 直链失败（Referer 注入未生效，这是 Electron 权限问题）：${e.message}`, 10000);
+      } else {
+        new Notice(`B站 直链解析失败，已回退内嵌播放器：${e.message}`, 8000);
+      }
       this.biliStream = null;
       this.mountIframe(embedFor(link, startAt));
     }
@@ -3171,6 +3175,17 @@ class VnsSettingTab extends PluginSettingTab {
       : "扫码登录后，B站播放器使用你的账号可用清晰度")
       .addButton((b) => b.setButtonText(this.plugin.hasBiliLogin() ? "管理登录" : "扫码登录").onClick(() => {
         new BiliLoginModal(this.app, this.plugin, async () => this.display()).open();
+      }));
+    new Setting(containerEl).setName("B站 播放").setDesc(this.plugin._biliRefererOk
+      ? "原生播放器已启用（直链 + 自绘控制条）"
+      : "⚠ Referer 注入未生效，B站 将回退内嵌播放器；重载插件可重试")
+      .addButton((b) => b.setButtonText("测试直链").onClick(async () => {
+        b.setDisabled(true);
+        try {
+          const r = await this.plugin.diagnoseBiliStream();
+          new Notice(r, 15000);
+        } catch (e) { new Notice(`诊断失败：${e.message}`, 15000); }
+        finally { b.setDisabled(false); }
       }));
     new Setting(containerEl).setName("测试本地转录").setDesc("检查 Python、faster-whisper 与 asr_bridge.py 是否就位")
       .addButton((b) => b.setButtonText("运行测试").onClick(async () => {
@@ -3717,6 +3732,31 @@ class VideoNoteStudio extends Plugin {
     return leaf;
   }
 
+  /** 设置页「测试直链」：把 B站 解析链路每步结果都报出来 */
+  async diagnoseBiliStream() {
+    const lines = [];
+    lines.push(`Referer 注入: ${this._biliRefererOk ? "✅ 已安装" : "❌ 未安装"}`);
+    lines.push(`B站 登录: ${this.hasBiliLogin() ? "✅ 已登录" : "未登录（游客最高 480P 左右）"}`);
+    const testLink = { kind: "bilibili", id: "BV1nZpd6nEsF", page: 1, url: "https://www.bilibili.com/video/BV1nZpd6nEsF" };
+    try {
+      const view = await this.requestJson(`https://api.bilibili.com/x/web-interface/view?bvid=${testLink.id}`, this.biliHeaders());
+      lines.push(`view API: code=${view.code} cid=${view.data ? view.data.cid : "?"}`);
+      if (view.code !== 0) { lines.push(`  msg=${view.message || ""}`); return lines.join("\n"); }
+      const s = await this.resolveBiliStream(testLink);
+      lines.push(`playurl: mode=${s.mode} current=${s.current}`);
+      lines.push(`可选画质: ${s.qualities.map((q) => `${q.label}${q.available === false ? "(不可用)" : ""}`).join(" / ")}`);
+      if (s.mode === "dash") {
+        const pick = this.pickDashStream(s, s.current);
+        lines.push(`选中流: qn=${pick.qn} ${pick.width}x${pick.height}`);
+        lines.push(`video host=${pick.videoUrl ? new URL(pick.videoUrl).host : "无"}`);
+        lines.push(`audio host=${pick.audioUrl ? new URL(pick.audioUrl).host : "无"}`);
+      }
+    } catch (e) {
+      lines.push(`❌ 失败: ${e.message}`);
+    }
+    return lines.join("\n");
+  }
+
   async testBridge() {
     if (!cp) return "当前环境起不了外部进程（仅桌面版）";
     for (const bin of this.pythonCandidates()) {
@@ -3796,7 +3836,8 @@ class VideoNoteStudio extends Plugin {
     return (data.data || []).map((m) => m.id).filter(Boolean).sort();
   }
 
-  /** B站 CDN 校验 Referer，必须给直链请求补上，否则 403 */
+  /** B站 CDN 校验 Referer，必须给直链请求补上，否则 403。
+   *  注意：不能设 Origin——设了会让 cors 校验把请求变成需要预检的跨域请求而失败。 */
   setupBiliReferer() {
     try {
       const electron = require("electron");
@@ -3805,17 +3846,20 @@ class VideoNoteStudio extends Plugin {
         : (electron.session && electron.session.defaultSession);
       if (!session || !session.webRequest) {
         console.debug("[vns] 没有 webRequest 权限，B站 直链可能 403");
+        this._biliRefererOk = false;
         return;
       }
-      const filter = { urls: ["*://*.bilivideo.com/*", "*://*.bilivideo.cn/*", "*://*.akamaized.net/*", "*://*.mcdn.bilivideo.com/*"] };
+      const filter = { urls: ["*://*.bilivideo.com/*", "*://*.bilivideo.cn/*", "*://*.mcdn.bilivideo.com/*", "*://*.szbdyd.com/*"] };
       session.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
         const h = details.requestHeaders || {};
         h["Referer"] = "https://www.bilibili.com/";
-        h["Origin"] = "https://www.bilibili.com";
+        delete h["Origin"];
         callback({ requestHeaders: h });
       });
-      this._biliRefererInstalled = true;
+      this._biliRefererOk = true;
+      console.debug("[vns] B站 Referer 注入已安装");
     } catch (e) {
+      this._biliRefererOk = false;
       console.debug("[vns] 安装 B站 Referer 失败", e.message);
     }
   }
@@ -3887,8 +3931,13 @@ class VideoNoteStudio extends Plugin {
 
   async requestJson(url, headers) {
     const res = await requestUrl({ url, method: "GET", throw: false, headers: headers || {} });
-    if (res.status >= 400) throw new Error(`HTTP ${res.status}`);
-    return res.json || JSON.parse(res.text || "{}");
+    const text = res.text || (res.json ? JSON.stringify(res.json) : "");
+    if (res.status >= 400) throw new Error(`HTTP ${res.status} @ ${url.slice(0, 80)}: ${String(text).slice(0, 160)}`);
+    try {
+      return res.json || JSON.parse(text || "{}");
+    } catch (e) {
+      throw new Error(`返回不是 JSON @ ${url.slice(0, 80)}: ${String(text).slice(0, 160)}`);
+    }
   }
 
   async requestHtml(url) {
