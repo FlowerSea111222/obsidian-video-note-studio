@@ -2630,6 +2630,7 @@ class VideoPlayerView extends ItemView {
 
   async onClose() {
     this.destroyPlayerChrome();
+    this.destroyWebviewControls();
     this.hideQualityMenu();
     if (this.webviewEl) { try { this.webviewEl.remove(); } catch (e) { /* ignore */ } this.webviewEl = null; }
   }
@@ -2807,6 +2808,7 @@ class VideoPlayerView extends ItemView {
     }
     if (this.iframeEl) { this.iframeEl.src = "about:blank"; this.iframeEl = null; }
     if (this.webviewEl) { try { this.webviewEl.remove(); } catch (e) { /* ignore */ } this.webviewEl = null; }
+    this.destroyWebviewControls();
     if (this.stage) this.stage.removeClass("is-webview");
     this.webviewWarnEl = null;
 
@@ -3039,6 +3041,7 @@ class VideoPlayerView extends ItemView {
       if (this.immersive) setTimeout(() => this.setImmersive(true, { remember: false }), 800);
     });
     this.mountWebviewZoomBar(link);
+    this.mountWebviewControls();
     this.timer = setInterval(() => this.tick(), 1000);
     this.updateClock();
   }
@@ -3264,14 +3267,78 @@ class VideoPlayerView extends ItemView {
     try { return await wv.executeJavaScript(code, true); } catch (e) { return null; }
   }
 
+  /** 页面里可能有好几个 video（信息流/广告），取面积最大的那个 */
+  webviewPickVideo() {
+    return "const vids = Array.from(document.querySelectorAll('video')).filter((x) => x.videoWidth > 0 && x.videoHeight > 0).sort((a, b) => (b.videoWidth * b.videoHeight) - (a.videoWidth * a.videoHeight)); const v = vids[0] || document.querySelector('video');";
+  }
+
   webviewSeek(sec) {
     const s = Math.max(0, sec || 0);
     this.lastKnownTime = s;
-    this.webviewExec(`(() => { const v = document.querySelector('video'); if (v) { v.currentTime = ${s}; v.play().catch(() => {}); } return 1; })()`);
+    this.webviewExec(`(() => { ${this.webviewPickVideo()} if (v) { v.muted = false; v.currentTime = ${s}; v.play().catch(() => {}); } return 1; })()`);
   }
 
   webviewTogglePlay() {
-    this.webviewExec("(() => { const v = document.querySelector('video'); if (v) { if (v.paused) v.play().catch(() => {}); else v.pause(); } return 1; })()");
+    this.webviewExec(`(() => { ${this.webviewPickVideo()} if (v) { if (v.paused) v.play().catch(() => {}); else v.pause(); } return 1; })()`)
+      .then(() => setTimeout(() => this.syncWebviewState(), 150));
+  }
+
+  /** 抖音/网页 webview 播放时的悬浮控制条：播放暂停 / ±5 秒 / 静音 / 音量 */
+  mountWebviewControls() {
+    this.destroyWebviewControls();
+    if (!this.stage) return;
+    const bar = this.stage.createDiv({ cls: "vns-wv-ctl" });
+    this.wvCtl = bar;
+    const mk = (label, title, fn) => {
+      const b = bar.createEl("button", { cls: "vns-ctl-btn", text: label });
+      if (title) b.title = title;
+      b.addEventListener("click", (ev) => { ev.preventDefault(); ev.stopPropagation(); fn(); });
+      return b;
+    };
+    this.wvBackBtn = mk("−5s", "后退 5 秒", () => this.webviewSeek(Math.max(0, (this.lastKnownTime || 0) - 5)));
+    this.wvPlayBtn = mk("▶", "播放 / 暂停", () => this.webviewTogglePlay());
+    this.wvFwdBtn = mk("+5s", "前进 5 秒", () => this.webviewSeek((this.lastKnownTime || 0) + 5));
+    const volWrap = bar.createDiv({ cls: "vns-wv-vol" });
+    this.wvMuteBtn = mk("🔊", "静音", () => this.webviewToggleMute());
+    this.wvVolSlider = volWrap.createEl("input", {
+      cls: "vns-ctl-vol-slider", attr: { type: "range", min: "0", max: "100", value: "100" },
+    });
+    this.wvVolSlider.addEventListener("input", () => this.webviewSetVolume(Number(this.wvVolSlider.value) / 100));
+    this.wvVolSlider.addEventListener("click", (ev) => ev.stopPropagation());
+    this.wvStateTimer = setInterval(() => this.syncWebviewState(), 800);
+  }
+
+  destroyWebviewControls() {
+    if (this.wvStateTimer) { clearInterval(this.wvStateTimer); this.wvStateTimer = null; }
+    if (this.wvCtl) { try { this.wvCtl.remove(); } catch (e) { /* ignore */ } this.wvCtl = null; }
+    this.wvPlayBtn = null;
+    this.wvMuteBtn = null;
+    this.wvVolSlider = null;
+  }
+
+  async syncWebviewState() {
+    if (!this.webviewEl || !this.wvPlayBtn) return;
+    const raw = await this.webviewExec(`(() => { ${this.webviewPickVideo()} if (!v) return ''; return JSON.stringify({ p: v.paused, m: v.muted, vol: v.volume, t: v.currentTime, r: v.playbackRate }); })()`);
+    if (!raw) return;
+    let st = null;
+    try { st = JSON.parse(raw); } catch (e) { return; }
+    if (!st) return;
+    if (this.wvPlayBtn) this.wvPlayBtn.setText(st.p ? "▶" : "⏸");
+    if (this.wvMuteBtn) this.wvMuteBtn.setText((st.m || !st.vol) ? "🔇" : "🔊");
+    if (this.wvVolSlider && document.activeElement !== this.wvVolSlider) {
+      this.wvVolSlider.value = String(Math.round((Number(st.vol) || 0) * 100));
+    }
+    if (typeof st.t === "number" && st.t >= 0) this.lastKnownTime = st.t;
+  }
+
+  async webviewToggleMute() {
+    await this.webviewExec(`(() => { ${this.webviewPickVideo()} if (v) { v.muted = !v.muted; if (!v.muted && v.volume === 0) v.volume = 1; } return 1; })()`);
+    setTimeout(() => this.syncWebviewState(), 150);
+  }
+
+  async webviewSetVolume(vol) {
+    const v = Math.min(1, Math.max(0, Number(vol) || 0));
+    await this.webviewExec(`(() => { ${this.webviewPickVideo()} if (v) { v.volume = ${v}; v.muted = false; } return 1; })()`);
   }
 
   mountIframe(src) {
@@ -3770,6 +3837,12 @@ class DouyinFavGalleryModal extends Modal {
     this.sort = "default";
     this.mode = plugin.settings.favMode === "heavy" ? "heavy" : "light";
     this.wv = null;
+    this.fwv = null;
+    this.fwvOk = false;
+    this.folders = [];
+    this.foldersLoading = false;
+    this.source = "";
+    this.sourceName = "全部收藏";
     this.ready = false;
     this.total = 0;
   }
@@ -3784,7 +3857,10 @@ class DouyinFavGalleryModal extends Modal {
 
   onClose() {
     try { if (this.wv) this.wv.remove(); } catch (e) { /* ignore */ }
+    try { if (this.fwv) this.fwv.remove(); } catch (e) { /* ignore */ }
     this.wv = null;
+    this.fwv = null;
+    this.fwvOk = false;
     this.contentEl.empty();
   }
 
@@ -3800,6 +3876,9 @@ class DouyinFavGalleryModal extends Modal {
     this.countEl = t.createSpan({ cls: "vns-fav-count", text: "0 条" });
 
     const tools = head.createDiv({ cls: "vns-fav-tools" });
+    this.folderSel = tools.createEl("select", { cls: "dropdown vns-fav-folder" });
+    this.fillFolderSel();
+    this.folderSel.onchange = () => this.switchSource(this.folderSel.value);
     this.modeSel = tools.createEl("select", { cls: "dropdown" });
     for (const opt of [["light", "轻量：文案 + 封面"], ["heavy", "重量：下载视频 + 转录"]]) {
       this.modeSel.createEl("option", { value: opt[0], text: opt[1] });
@@ -3821,7 +3900,11 @@ class DouyinFavGalleryModal extends Modal {
       this.cursor = 0;
       this.hasMore = true;
       this.selected.clear();
+      this.source = "";
+      this.sourceName = "全部收藏";
+      if (this.folderSel) this.folderSel.value = "";
       this.renderGrid();
+      if (this.moreBtn) { this.moreBtn.setText("加载更多"); this.moreBtn.disabled = false; }
       this.loadPage();
     };
 
@@ -3884,9 +3967,116 @@ class DouyinFavGalleryModal extends Modal {
     }
     this.ready = true;
     if (!this.items.length) await this.loadPage();
+    this.loadFolderList().catch(() => {});
+  }
+
+  /* ---------- 收藏夹 ---------- */
+  fillFolderSel() {
+    if (!this.folderSel) return;
+    this.folderSel.empty();
+    this.folderSel.createEl("option", { value: "", text: "全部收藏" });
+    for (const f of this.folders) {
+      this.folderSel.createEl("option", { value: f.id, text: `${f.name || "收藏夹"}（${f.total}）` });
+    }
+    this.folderSel.value = this.source;
+  }
+
+  async ensureFolderWv() {
+    if (!this.fwv) {
+      this.fwv = document.createElement("webview");
+      this.fwv.setAttribute("partition", DOUYIN_PARTITION);
+      this.fwv.setAttribute("src", this.plugin.douyinFolderUrl());
+      this.fwv.setAttribute("webpreferences", "backgroundThrottling=false");
+      this.fwv.style.width = "100%";
+      this.fwv.style.height = "100%";
+      this.wvBox.appendChild(this.fwv);
+    }
+    if (this.fwvOk) return this.fwv;
+    this.setStatus("正在连接抖音收藏夹…");
+    this.fwvOk = await this.plugin.waitFavSigner(this.fwv, 45000);
+    return this.fwv;
+  }
+
+  async navWv(wv, url, waitMs) {
+    try {
+      if (typeof wv.loadURL === "function") await wv.loadURL(url);
+      else wv.setAttribute("src", url);
+    } catch (e) {
+      try { wv.setAttribute("src", url); } catch (e2) { /* ignore */ }
+    }
+    await new Promise((r) => setTimeout(r, waitMs || 3000));
+  }
+
+  async loadFolderList() {
+    if (this.foldersLoading) return;
+    this.foldersLoading = true;
+    try {
+      const wv = await this.ensureFolderWv();
+      if (!this.fwvOk) return;
+      const list = await this.plugin.loadDouyinFolders(wv);
+      if (list && list.length) {
+        this.folders = list;
+        this.fillFolderSel();
+      }
+    } finally {
+      this.foldersLoading = false;
+    }
+  }
+
+  async switchSource(id) {
+    const fid = String(id || "");
+    if (fid === this.source) return;
+    this.source = fid;
+    this.selected.clear();
+    this.items = [];
+    this.byId.clear();
+    this.cursor = 0;
+    this.hasMore = true;
+    this.renderGrid();
+    if (this.moreBtn) { this.moreBtn.setText("加载更多"); this.moreBtn.disabled = false; }
+    if (!fid) {
+      this.sourceName = "全部收藏";
+      this.loadPage();
+      return;
+    }
+    const idx = this.folders.findIndex((f) => f.id === fid);
+    const folder = idx >= 0 ? this.folders[idx] : null;
+    this.sourceName = folder ? folder.name : "收藏夹";
+    if (idx < 0) { this.setStatus("收藏夹信息丢失，请点「刷新列表」重来"); return; }
+    if (this.loading) return;
+    this.loading = true;
+    this.setStatus(`正在打开收藏夹「${this.sourceName}」…`);
+    try {
+      const wv = await this.ensureFolderWv();
+      if (!this.fwvOk) { this.setStatus("没连上抖音：请点「连接抖音 / 登录」扫码后再选收藏夹"); return; }
+      await this.navWv(wv, this.plugin.douyinFolderUrl(), 4000);
+      this.setStatus(`正在读取「${this.sourceName}」里的视频…`);
+      const got = await this.plugin.loadDouyinFolderIds(wv, idx);
+      const ids = (got && got.ids) || [];
+      if (!ids.length) {
+        this.setStatus(`没读到「${this.sourceName}」里的视频${got && got.err ? `（${got.err}）` : ""}，可再选一次重试`);
+        return;
+      }
+      this.setStatus(`拿到 ${ids.length} 个视频，正在取详情…`);
+      const items = await this.plugin.fetchDouyinDetails(wv, ids);
+      for (const it of items) {
+        if (!it || !it.id || it.broken || this.byId.has(it.id)) continue;
+        this.byId.set(it.id, it);
+        this.items.push(it);
+      }
+      this.hasMore = false;
+      this.setStatus(`「${this.sourceName}」已载入 ${this.items.length} 条｜勾选后点「生成笔记」`);
+      this.renderGrid();
+      if (this.moreBtn) { this.moreBtn.setText("收藏夹模式先取一页"); this.moreBtn.disabled = true; }
+    } catch (e) {
+      this.setStatus(`读取收藏夹失败：${e.message}`);
+    } finally {
+      this.loading = false;
+    }
   }
 
   async loadPage() {
+    if (this.source) return;
     if (!this.ready || this.loading || !this.hasMore) return;
     this.loading = true;
     this.moreBtn.setText("正在加载…");
@@ -3927,12 +4117,37 @@ class DouyinFavGalleryModal extends Modal {
 
   /* ---------- 列表渲染 ---------- */
   coverFor(item) {
-    const attach = this.plugin.settings.favAttachFolder || "抖音收藏/附件";
-    const p = `${attach}/${item.id}/cover.jpg`;
-    try {
-      if (this.app.vault.getAbstractFileByPath(p)) return this.app.vault.adapter.getResourcePath(p);
-    } catch (e) { /* ignore */ }
     return item.cover || (item.imgs && item.imgs[0]) || "";
+  }
+
+  /** 点卡片：有笔记就打开，没有就先生成；同时弹出播放器 */
+  async openItem(item) {
+    if (this.busy) return;
+    const url = `https://www.douyin.com/video/${item.id}`;
+    const known = this.index[item.id];
+    let path = known && this.app.vault.getAbstractFileByPath(known) ? known : "";
+    if (!path) {
+      this.busy = true;
+      this.setStatus(`正在生成笔记：${this.plugin.favTitle(item)}（${this.mode === "heavy" ? "体积/转录，约 1-3 分钟" : "轻量"}）`);
+      try {
+        path = await this.plugin.importFavItem(item, this.mode, {
+          summarize: this.plugin.settings.autoSummarize,
+          transcribe: this.mode === "heavy",
+        });
+        this.index[item.id] = path;
+        await this.plugin.saveFavIndex(this.index);
+      } catch (e) {
+        this.setStatus(`❌ 生成失败：${e.message}`);
+        new Notice(`生成失败：${e.message}`, 8000);
+        this.busy = false;
+        return;
+      }
+      this.busy = false;
+      this.renderGrid();
+    }
+    this.setStatus(`已打开：${path}`);
+    await this.app.workspace.openLinkText(path, "", false);
+    await this.plugin.playVideoUrl(url);
   }
 
   visibleItems() {
@@ -3971,7 +4186,7 @@ class DouyinFavGalleryModal extends Modal {
         this.updateSelInfo();
       };
       check.onclick = (ev) => ev.stopPropagation();
-      thumb.onclick = () => { check.checked = !check.checked; check.onchange(); };
+      thumb.onclick = () => { this.openItem(item); };
       const src = this.coverFor(item);
       if (src) {
         const img = thumb.createEl("img", { attr: { loading: "lazy", src: src, alt: "" } });
@@ -3985,7 +4200,7 @@ class DouyinFavGalleryModal extends Modal {
 
       const body = card.createDiv({ cls: "vns-fav-body" });
       const titleEl = body.createDiv({ cls: "vns-fav-title", text: this.plugin.favTitle(item) || item.id });
-      titleEl.onclick = () => { check.checked = !check.checked; check.onchange(); };
+      titleEl.onclick = () => { this.openItem(item); };
       const meta = body.createDiv({ cls: "vns-fav-meta-line" });
       meta.createSpan({ text: `@${item.author || "抖音"}` });
       if (item.digg) meta.createSpan({ text: `👍 ${this.plugin.favNum(item.digg)}` });
@@ -5090,6 +5305,10 @@ class VideoNoteStudio extends Plugin {
   }
 
   async handleVnsProtocol(params) {
+    if (params && params.cmd === "favswitch") { await this.runFavSwitchSelftest(Number(params.i)); return; }
+    if (params && params.cmd === "favopen") { await this.runFavOpenSelftest(Number(params.i)); return; }
+    if (params && params.cmd === "favgen") { await this.runFavGenSelftest(Number(params.i)); return; }
+    if (params && params.cmd === "favfoldertest") { await this.runFavFolderSelftest(Number(params.i)); return; }
     if (params && params.cmd === "gallery") { await this.openFavGallery(); return; }
     if (params && params.cmd === "probe") { await this.runProbe(params.u); return; }
     if (params && params.cmd === "selftest") { await this.runSelfTest(); return; }
@@ -5324,6 +5543,260 @@ class VideoNoteStudio extends Plugin {
     }, 14000);
   }
 
+
+  /** 收藏夹 tab 的页面地址 */
+  douyinFolderUrl() {
+    return "https://www.douyin.com/user/self?showTab=favorite_collection&showSubTab=favorite_folder";
+  }
+
+  /** ===== 收藏夹：读收藏夹列表（React props）===== */
+  async loadDouyinFolders(wv) {
+    const js = `(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      for (let i = 0; i < 25; i += 1) {
+        if (document.querySelectorAll('ul[data-e2e="scroll-list"] > li').length) break;
+        await wait(1000);
+      }
+      const lis = Array.from(document.querySelectorAll('ul[data-e2e="scroll-list"] > li'));
+      const out = [];
+      for (const li of lis) {
+        const k = Object.keys(li).find((x) => x.indexOf('__reactFiber$') === 0);
+        let node = k ? li[k] : null;
+        for (let i = 0; i < 10 && node; i += 1) {
+          const p = node.memoizedProps;
+          const info = p && (p.itemInfo || p.data);
+          if (info && info.collectionFolderId) {
+            out.push({ id: String(info.collectionFolderId), name: String(info.collectionFolderName || '').replace(/\s+/g, ' ').trim(), total: Number(info.videoTotal || 0) });
+            break;
+          }
+          node = node.return;
+        }
+      }
+      return JSON.stringify({ folders: out });
+    })()`;
+    try {
+      const raw = await wv.executeJavaScript(js, true);
+      const j = JSON.parse(raw || "{}");
+      return j.folders || [];
+    } catch (e) {
+      console.debug("[vns] 读收藏夹失败", e.message);
+      return [];
+    }
+  }
+
+  /** 点进第 index 个收藏夹，把网格里的视频 id 收集出来（含向下滚动） */
+  async loadDouyinFolderIds(wv, index) {
+    const js = `(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const seen = () => {
+        const s = new Set();
+        for (const a of Array.from(document.querySelectorAll('a[href*="/video/"]'))) {
+          const h = String(a.getAttribute('href'));
+          const i0 = h.indexOf('/video/');
+          if (i0 < 0) continue;
+          let n = '';
+          for (const ch of h.slice(i0 + 7)) { if (ch >= '0' && ch <= '9') n += ch; else break; }
+          if (n.length >= 6) s.add(n);
+        }
+        return s;
+      };
+      for (let i = 0; i < 25; i += 1) {
+        if (document.querySelectorAll('ul[data-e2e="scroll-list"] > li').length) break;
+        await wait(1000);
+      }
+      const lis = Array.from(document.querySelectorAll('ul[data-e2e="scroll-list"] > li'));
+      const li = lis[${index}];
+      if (!li) return JSON.stringify({ err: 'no-folder' });
+      const el = li.querySelector('.pZnOIHUE') || li;
+      const r = el.getBoundingClientRect();
+      const o = { bubbles: true, cancelable: true, view: window, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+      ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((t) => {
+        try { el.dispatchEvent(new (t.indexOf('pointer') === 0 ? PointerEvent : MouseEvent)(t, o)); } catch (e) {}
+      });
+      let ids = seen();
+      for (let i = 0; i < 20 && ids.size <= 12; i += 1) { await wait(1000); ids = seen(); }
+      for (let i = 0; i < 4; i += 1) { window.scrollBy(0, 1800); await wait(1600); ids = seen(); }
+      return JSON.stringify({ ids: Array.from(ids), href: location.href, count: ids.size });
+    })()`;
+    try {
+      const raw = await wv.executeJavaScript(js, true);
+      return JSON.parse(raw || "{}");
+    } catch (e) {
+      return { err: String(e.message || e) };
+    }
+  }
+
+  /** 逐个取作品详情（页内 detail 接口，无需额外签名） */
+  async fetchDouyinDetails(wv, ids) {
+    const list = (ids || []).slice(0, 60);
+    const js = `(async () => {
+      const out = [];
+      const P = 'device_platform=webapp&aid=6383&channel=channel_pc_web&pc_client_type=1&pc_libra_divert=Windows&update_version_code=170400&version_code=170400&version_name=17.4.0&cookie_enabled=true&platform=PC';
+      for (const id of ${JSON.stringify(list)}) {
+        try {
+          const r = await fetch('https://www.douyin.com/aweme/v1/web/aweme/detail/?' + P + '&aweme_id=' + id, { credentials: 'include' });
+          const t = await r.text();
+          const j = JSON.parse(t);
+          const d = j && j.aweme_detail;
+          if (!d) { out.push({ id: id, broken: true }); continue; }
+          const v = d.video || {};
+          const cover = (((v.cover || {}).url_list) || [])[0] || ((((v.origin_cover || {}).url_list) || [])[0]) || '';
+          const play = (((v.play_addr || {}).url_list) || [])[0] || '';
+          const br = ((v.bit_rate || [])[0] || {});
+          const playHi = ((((br.play_addr || {}).url_list) || [])[0]) || play;
+          const imgs = (d.images || []).map((im) => (((im.url_list) || [])[0] || '')).filter(Boolean);
+          const dur = Number(v.duration || 0);
+          out.push({
+            id: String(d.aweme_id || id),
+            desc: String(d.desc || ''),
+            author: String(((d.author || {}).nickname) || ''),
+            time: Number(d.create_time || 0),
+            dur: Math.round(dur > 1000 ? dur / 1000 : dur),
+            cover: cover,
+            play: playHi,
+            imgs: imgs,
+            type: (imgs.length ? 'image' : 'video'),
+            digg: Number(((d.statistics || {}).digg_count) || 0),
+            comment: Number(((d.statistics || {}).comment_count) || 0),
+            collect: Number(((d.statistics || {}).collect_count) || 0),
+          });
+        } catch (e) {
+          out.push({ id: id, broken: true });
+        }
+        await new Promise((r) => setTimeout(r, 120));
+      }
+      return JSON.stringify(out);
+    })()`;
+    try {
+      const raw = await wv.executeJavaScript(js, true);
+      return JSON.parse(raw || "[]");
+    } catch (e) {
+      console.debug("[vns] 取详情失败", e.message);
+      return [];
+    }
+  }
+
+
+  /** 自测：收藏夹列表 -> 点进去 -> 抓 id -> 取详情（结果写临时文件） */
+  async runFavFolderSelftest(idx) {
+    const out = { at: new Date().toISOString(), codeVersion: "favfolder-test-1" };
+    const modal = new Modal(this.app);
+    const wv = document.createElement("webview");
+    wv.setAttribute("partition", DOUYIN_PARTITION);
+    wv.setAttribute("src", this.douyinFolderUrl());
+    wv.style.width = "100%";
+    wv.style.height = "100%";
+    modal.onOpen = () => {
+      modal.contentEl.addClass("vns-douyin-modal");
+      modal.contentEl.createEl("h3", { text: "收藏夹自测" });
+      const box = modal.contentEl.createDiv({ cls: "vns-douyin-frame" });
+      box.appendChild(wv);
+    };
+    modal.onClose = () => { try { wv.remove(); } catch (e) {} modal.contentEl.empty(); };
+    modal.open();
+    out.signer = await this.waitFavSigner(wv, 50000);
+    await new Promise((r) => setTimeout(r, 5000));
+    const folders = await this.loadDouyinFolders(wv);
+    out.folders = folders.slice(0, 8).map((f) => ({ name: f.name, total: f.total }));
+    out.folderCount = folders.length;
+    const i = typeof idx === "number" && idx >= 0 ? idx : 0;
+    out.picked = folders[i] ? folders[i].name : "";
+    const got = await this.loadDouyinFolderIds(wv, i);
+    out.ids = (got && got.ids || []).slice(0, 10);
+    out.idCount = (got && got.ids || []).length;
+    out.idsErr = got && got.err;
+    let items = [];
+    if (out.idCount) items = await this.fetchDouyinDetails(wv, (got.ids || []).slice(0, 6));
+    out.items = items.map((it) => ({ id: it.id, t: String(it.desc || "").slice(0, 24), a: it.author, dur: it.dur, type: it.type, play: !!(it.play || "").length, broken: !!it.broken }));
+    try {
+      require("fs").writeFileSync(require("path").join(require("os").tmpdir(), "vns-favfolder-test.json"), JSON.stringify(out, null, 2));
+    } catch (e) { /* ignore */ }
+    try { modal.close(); } catch (e) { /* ignore */ }
+  }
+
+
+  /** 自测：从收藏夹取第一条，按新模板生成笔记（验证属性精简 + 无附件） */
+  async runFavGenSelftest(idx) {
+    const out = { at: new Date().toISOString(), codeVersion: "favgen-test-1" };
+    const modal = new Modal(this.app);
+    const wv = document.createElement("webview");
+    wv.setAttribute("partition", DOUYIN_PARTITION);
+    wv.setAttribute("src", this.douyinFolderUrl());
+    wv.style.width = "100%";
+    wv.style.height = "100%";
+    modal.onOpen = () => {
+      modal.contentEl.addClass("vns-douyin-modal");
+      modal.contentEl.createEl("h3", { text: "收藏夹生成自测" });
+      const box = modal.contentEl.createDiv({ cls: "vns-douyin-frame" });
+      box.appendChild(wv);
+    };
+    modal.onClose = () => { try { wv.remove(); } catch (e) {} modal.contentEl.empty(); };
+    modal.open();
+    out.signer = await this.waitFavSigner(wv, 50000);
+    await new Promise((r) => setTimeout(r, 5000));
+    const got = await this.loadDouyinFolderIds(wv, typeof idx === "number" && idx >= 0 ? idx : 0);
+    const ids = (got && got.ids) || [];
+    out.idCount = ids.length;
+    const items = await this.fetchDouyinDetails(wv, ids.slice(0, 3));
+    const item = (items || []).find((x) => x && x.id && !x.broken);
+    out.item = item ? { id: item.id, author: item.author, type: item.type, dur: item.dur } : null;
+    if (item) {
+      try {
+        const path = await this.importFavItem(item, "light", { reason: "selftest" });
+        out.notePath = String(path || "");
+        const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
+        if (file) out.head = (await this.app.vault.read(file)).slice(0, 700);
+        const attach = this.app.vault.getAbstractFileByPath("抖音收藏/附件");
+        out.hasAttachFolder = !!attach;
+        out.head = out.head || "";
+      } catch (e) { out.genErr = String(e.message || e); }
+    }
+    try {
+      require("fs").writeFileSync(require("path").join(require("os").tmpdir(), "vns-favgen-test.json"), JSON.stringify(out, null, 2));
+    } catch (e) { /* ignore */ }
+    try { modal.close(); } catch (e) { /* ignore */ }
+  }
+
+
+  /** 自测：选片界面切到某个收藏夹 -> 列表刷新 -> 点开第一条（笔记 + 播放器） */
+  async runFavSwitchSelftest(idx) {
+    const out = { at: new Date().toISOString(), codeVersion: "favswitch-test-1" };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const modal = await this.openFavGallery();
+    for (let i = 0; i < 30; i += 1) { await wait(1000); if (modal.items && modal.items.length) break; }
+    out.itemsAll = modal.items.length;
+    for (let i = 0; i < 40; i += 1) { await wait(1000); if (modal.folders && modal.folders.length) break; }
+    out.folders = (modal.folders || []).length;
+    const i0 = typeof idx === "number" && idx >= 0 && idx < (modal.folders || []).length ? idx : 0;
+    const folder = (modal.folders || [])[i0];
+    out.picked = folder ? { name: folder.name, total: folder.total } : null;
+    if (folder) {
+      await modal.switchSource(folder.id);
+      for (let i = 0; i < 60; i += 1) { await wait(1000); if (modal.items && modal.items.length) break; }
+      out.itemsFolder = modal.items.length;
+      out.sourceName = modal.sourceName || "";
+      out.status = (modal.statusEl && modal.statusEl.textContent) || "";
+      const first = modal.items[0];
+      out.first = first ? { id: first.id, type: first.type, dur: first.dur, author: first.author } : null;
+      if (first) {
+        try { await modal.openItem(first); out.opened = true; } catch (e) { out.openErr = String(e.message || e); }
+        await wait(4000);
+        const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_PLAYER)[0];
+        out.playerOpen = !!leaf;
+        out.activeNote = (this.app.workspace.getActiveFile() || {}).path || "";
+        if (leaf && leaf.view) {
+          out.ctlExists = !!leaf.view.containerEl.querySelector(".vns-wv-ctl");
+          out.ctlButtons = Array.from(leaf.view.containerEl.querySelectorAll(".vns-wv-ctl button")).map((b) => b.textContent).slice(0, 6);
+          out.slider = !!leaf.view.containerEl.querySelector(".vns-wv-ctl input[type=range]");
+        }
+      }
+    }
+    try { modal.close(); } catch (e) { /* ignore */ }
+    try {
+      require("fs").writeFileSync(require("path").join(require("os").tmpdir(), "vns-favswitch-test.json"), JSON.stringify(out, null, 2));
+    } catch (e) { /* ignore */ }
+  }
+
   /** 自检：伪渲染设置页 + 检查关键方法存在，结果写临时文件 */
   async runSelfTest() {
     const out = { at: new Date().toISOString(), codeVersion: "selftest-r1" };
@@ -5372,7 +5845,47 @@ class VideoNoteStudio extends Plugin {
 
   /** 打开「抖音收藏」卡片墙：自己挑片生成笔记 */
   async openFavGallery() {
-    new DouyinFavGalleryModal(this.app, this).open();
+    if (this._galleryModal) { try { this._galleryModal.close(); } catch (e) { /* ignore */ } }
+    const modal = new DouyinFavGalleryModal(this.app, this);
+    this._galleryModal = modal;
+    modal.open();
+    return modal;
+  }
+
+  /** 自测：打开选片界面，等列表就绪后点开第 N 条（应同时出现笔记 + 播放器） */
+  async runFavOpenSelftest(idx) {
+    const out = { at: new Date().toISOString(), codeVersion: "favopen-test-1" };
+    const modal = await this.openFavGallery();
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    for (let i = 0; i < 30; i += 1) {
+      await wait(1000);
+      if (modal.items && modal.items.length) break;
+    }
+    out.items = modal.items.length;
+    for (let i = 0; i < 40; i += 1) {
+      await wait(1000);
+      if (modal.folders && modal.folders.length) break;
+    }
+    out.folders = (modal.folders || []).length;
+    out.folderNames = (modal.folders || []).slice(0, 5).map((f) => `${f.name}:${f.total}`);
+    out.selOptions = modal.folderSel ? modal.folderSel.options.length : -1;
+    const n = typeof idx === "number" && idx >= 0 ? idx : 0;
+    const item = modal.items[n];
+    out.picked = item ? { id: item.id, author: item.author, type: item.type } : null;
+    if (item) {
+      try { await modal.openItem(item); out.opened = true; } catch (e) { out.openErr = String(e.message || e); }
+      await wait(4000);
+      const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_PLAYER)[0];
+      out.playerOpen = !!leaf;
+      out.activeNote = (this.app.workspace.getActiveFile() || {}).path || "";
+      if (leaf && leaf.view) {
+        out.ctlExists = !!leaf.view.containerEl.querySelector(".vns-wv-ctl");
+        out.hasWv = !!leaf.view.containerEl.querySelector("webview");
+      }
+    }
+    try {
+      require("fs").writeFileSync(require("path").join(require("os").tmpdir(), "vns-favopen-test.json"), JSON.stringify(out, null, 2));
+    } catch (e) { /* ignore */ }
   }
 
   /** 常驻定时同步：设置分钟数 > 0 时，按间隔自动跑（每分钟检查一次） */
@@ -5546,20 +6059,19 @@ class VideoNoteStudio extends Plugin {
 
   buildFavNote(item, extra) {
     const url = `https://www.douyin.com/video/${item.id}`;
-    const fm = ["---", "type: douyin", `content_type: ${item.type}`, `douyin_id: "${item.id}"`,
-      `author: "${String(item.author || "").replace(/"/g, "'")}"`, `source: ${url}`];
-    if (item.time) {
-      const d = new Date(item.time * 1000);
-      fm.push(`create_time: "${d.toISOString().slice(0, 16).replace("T", " ")}"`);
-    }
-    fm.push("favorite: true", `synced: ${new Date().toISOString().slice(0, 10)}`, "tags:", "  - douyin", "  - douyin-favorite");
+    const fm = ["---",
+      `douyin_id: "${item.id}"`,
+      `author: "${String(item.author || "").replace(/"/g, "'")}"`,
+      "tags:",
+      "  - douyin"];
     for (const t of this.favTags(item)) fm.push(`  - ${t}`);
     fm.push("---", "");
 
     const body = [`# ${extra.title}`, ""];
-    if (extra.videoRel) body.push(`![[${extra.videoRel}]]`, "");
-    else if (extra.coverRel) body.push(`![[${extra.coverRel}]]`, "");
-    else if (item.cover) body.push(`![封面](${item.cover})`, "");
+    if (item.cover) body.push(`![封面](${item.cover})`, "");
+    if (item.type === "image" && item.imgs && item.imgs.length) {
+      body.push(...item.imgs.slice(0, 9).map((u) => `![](${u})`), "");
+    }
 
     const meta = [];
     if (item.author) meta.push(`作者 @${item.author}`);
@@ -5577,13 +6089,10 @@ class VideoNoteStudio extends Plugin {
       const sp = splitSummary(extra.summary);
       if (sp.points) body.push("## 要点", "", sp.points.trim(), "");
     }
-    if (extra.imageRels && extra.imageRels.length) {
-      body.push("## 配图", "", ...extra.imageRels.map((r) => `![[${r}]]`), "");
-    }
     if (extra.transcript && extra.transcript.length) {
       body.push(`> [!quote]- 视频逐字稿（${extra.transcript.length} 段，点击时间戳跳转播放）`);
-      for (const [t, s] of extra.transcript) {
-        body.push(`> - [${fmtTime(t)}](obsidian://vns?u=${encodeURIComponent(url)}&t=${Math.floor(t)}) ${s}`);
+      for (const [t, s2] of extra.transcript) {
+        body.push(`> - [${fmtTime(t)}](obsidian://vns?u=${encodeURIComponent(url)}&t=${Math.floor(t)}) ${s2}`);
       }
       body.push("");
     }
@@ -5594,33 +6103,14 @@ class VideoNoteStudio extends Plugin {
   async importFavItem(item, mode, opts) {
     opts = opts || {};
     const folder = this.settings.favFolder || "抖音收藏";
-    const attachRoot = this.settings.favAttachFolder || `${folder}/附件`;
-    const relBase = `${attachRoot}/${item.id}`;
     const title = this.favTitle(item);
     const url = `https://www.douyin.com/video/${item.id}`;
-    const ref = "https://www.douyin.com/";
     await ensureFolder(this.app, folder);
 
-    const coverRel = item.cover && await this.ensureFavBinary(item.cover, `${relBase}/cover.jpg`, ref) ? `${relBase}/cover.jpg` : "";
-    const imageRels = [];
-    if (item.type === "image") {
-      for (let i = 0; i < item.imgs.length; i += 1) {
-        const rel = `${relBase}/${String(i + 1).padStart(2, "0")}.jpg`;
-        if (await this.ensureFavBinary(item.imgs[i], rel, ref)) imageRels.push(rel);
-      }
-    }
-
     let transcript = [];
-    let videoRel = "";
-    if (mode === "heavy" && item.type === "video") {
-      const link = { kind: "douyin", id: item.id, url, mediaUrl: item.play || "", duration: item.dur };
-      if (item.play) {
-        const rel = `${relBase}/video.mp4`;
-        if (await this.ensureFavBinary(item.play, rel, ref)) videoRel = rel;
-      }
-      if (opts.transcribe && this.settings.asrEnabled) {
-        transcript = await this.localTranscript(link);
-      }
+    if (mode === "heavy" && item.type === "video" && opts.transcribe && this.settings.asrEnabled) {
+      // 不落盘：把直链交给 asr_bridge，由它自己下载到临时目录再转录
+      transcript = await this.localTranscript({ kind: "douyin", id: item.id, url, mediaUrl: item.play || "", duration: item.dur });
     }
 
     let summary = "";
@@ -5629,7 +6119,7 @@ class VideoNoteStudio extends Plugin {
       try { summary = await this.summarize({ title, author: item.author }, bodyText); } catch (e) { console.debug("[vns] 收藏摘要失败", e.message); }
     }
 
-    const md = this.buildFavNote(item, { title, coverRel, videoRel, imageRels, transcript, summary });
+    const md = this.buildFavNote(item, { title, transcript, summary });
     const path = uniquePath(this.app, folder, `${slug(item.author || "抖音")}-${slug(title)}`);
     await this.app.vault.create(path, md);
     return path;

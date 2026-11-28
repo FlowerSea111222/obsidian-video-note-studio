@@ -476,3 +476,20 @@
 .vns-fav-wvbox { border-radius: 6px; }
 .vns-fav-hint { font-size: 11px; opacity: 0.55; margin-left: auto; }
 .vns-fav-check { filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8)); width: 18px; height: 18px; }
+
+/* ---------- webview（抖音/网页）播放控制条 ---------- */
+.vns-wv-ctl {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border-radius: 999px; background: rgba(20, 20, 22, 0.72);
+  backdrop-filter: blur(8px); z-index: 30;
+  opacity: 0.25; transition: opacity 0.15s ease;
+}
+.vns-wv-ctl:hover { opacity: 1; }
+.vns-wv-ctl .vns-ctl-btn {
+  background: transparent; border: none; color: #fff; cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 6px 8px; border-radius: 8px; min-width: 30px;
+}
+.vns-wv-ctl .vns-ctl-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.vns-wv-vol { display: flex; align-items: center; gap: 4px; }
+.vns-wv-ctl .vns-ctl-vol-slider { width: 78px; accent-color: var(--interactive-accent); }

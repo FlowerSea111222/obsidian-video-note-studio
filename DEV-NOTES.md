@@ -211,3 +211,57 @@ tags: [douyin, douyin-favorite, <文案里的 #话题>]
 - 说明：一开始做成 `ItemView`（tab 视图），实测打开后 tab 被替换/丢失，改成 `Modal` 后稳定，因此现在是模态界面
 
 已知待做：`加载更多` 在模态里要滚到底；批量生成没有失败重试；「喜欢 / 作品 / 多收藏夹」还需页内点 tab 才能取到接口。
+
+### 8.9 第三轮：笔记精简 / 点卡片同时开笔记+播放器 / 不存附件 / 收藏夹 / 播放器控件
+
+按用户反馈改的五件事：
+
+1. **笔记属性只留 3 个**：`buildFavNote()` 的 frontmatter 现在只有
+   `douyin_id` / `author` / `tags`（tags = `douyin` + 话题标签）。
+   来源链接、发布时间、时长、点赞数等都挪进正文的 `> [!note]` callout。
+2. **点卡片 = 笔记 + 播放器**：`DouyinFavGalleryModal.openItem(item)`：
+   索引里有旧文件就直接打开，没有就先 `importFavItem()` 生成再打开，
+   最后 `plugin.playVideoUrl('https://www.douyin.com/video/<id>')` 把右侧播放器也打开，
+   与 B 站链接的体验一致。卡片的「勾选」只留给右上角 checkbox。
+3. **不保存附件**：`importFavItem()` 不再调 `ensureFavBinary()`，封面/配图用远程 URL（抖音图床），
+   重量模式的视频直链直接作为 `--media-url` 交给 `asr_bridge.py`，由它在临时目录下载、转完即弃，
+   vault 里不再出现 `附件/<id>/`。
+   （历史版本留下的 `抖音收藏/附件/` 不会被自动删除。）
+4. **按收藏夹选片**：见下面 8.10。
+5. **播放器可暂停/调音量**：`VideoPlayerView` 给 webview 加了一条自己画的悬浮控制条
+   `.vns-wv-ctl`（`−5s` / ▶⏸ / `+5s` / 🔊 / 音量滑块），
+   每 800ms `syncWebviewState()` 读一次 `JSON.stringify({p,m,vol,t,r})` 同步按钮与滑块状态；
+   `webviewSeek` / `webviewTogglePlay` 改用 `webviewPickVideo()`（按面积取页面上最大的 `<video>`），
+   因为抖音播放器里除了主视频还有一堆隐藏的 `<video>` 元素。
+
+### 8.10 收藏夹（收藏合集）是怎么取到的
+
+抖音的收藏夹**没有可用的公开接口**（这一轮逐一排除）：
+
+- `/aweme/v1/web/collects/list/`：POST → `403 Blocked by ArgusSecurityPlugin Sign Invalid`，
+  GET → 200 但返回 835KB 的 SPA HTML（说明这条路径在服务端不是 API）。
+- `/aweme/v1/web/collects/video/list/`、`/collects/detail/`、`/collects/aweme/list/`：
+  404 `Unsupported path(Janus)` 或回落 HTML。
+- `/aweme/v1/web/aweme/listcollection` 加 `collection_folder_id` / `folder_id` / `collects_id` /
+  `collect_type=2`（query 和 body 都试过）返回的永远是默认那 10 条，接口不认收藏夹参数。
+- 收藏夹页的 URL 参数（`collection_folder_id=`）也无效；`/collection/<id>`、`/folder/<id>` 都不对。
+
+最终走**页面内操作 + React 数据 + detail 接口**这条路，实测可用：
+
+1. 打开 `https://www.douyin.com/user/self?showTab=favorite_collection&showSubTab=favorite_folder`，
+   等 `ul[data-e2e="scroll-list"] > li` 出现（约 5–20s）。
+2. 每个 `li` 的 React fiber（`__reactFiber$…` 向上 `return.memoizedProps`）里有
+   `{collectionFolderId, collectionFolderName, videoTotal, cover}` —— 这就是收藏夹清单，
+   `loadDouyinFolders(wv)` 读出来填进下拉框。
+3. 进收藏夹必须点**封面区** `.pZnOIHUE`（点 li、点名字 `.rHOsituu`、点 ⋯ 都没反应，
+   页面不跳转也不发请求）；点完网格出现，`loadDouyinFolderIds(wv, i)` 收集页面上
+   `a[href*="/video/"]` 里的 id，并向下滚几屏多拿一些。
+4. 收藏夹内网格条目的 React props 里读不到 aweme 对象，所以改用
+   `/aweme/v1/web/aweme/detail/?…&aweme_id=<id>`（页内 `fetch`，带 cookie，无需额外签名）
+   逐条取详情，`fetchDouyinDetails(wv, ids)` 归一化成和列表页同样的结构。
+
+UI 上：选片界面顶栏多了一个「收藏夹」下拉（`全部收藏` + 各收藏夹及数量），
+切到某个收藏夹时用一个**独立的隐藏 webview**（`this.fwv`）去点，不打断「全部收藏」那条列表。
+
+已知限制：收藏夹一次性只取当前一屏（滚动抓到 14–35 条，取决于该夹的懒加载），
+没有做无限翻页；收藏夹列表也只取到当前可见的 10 个，没做滚动加载。
