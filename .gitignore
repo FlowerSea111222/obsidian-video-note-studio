@@ -2,3 +2,7 @@ node_modules/
 *.bak
 *.log
 .DS_Store
+
+# 参考仓库（本地克隆，不入库）
+_refs/
+_test/

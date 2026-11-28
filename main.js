@@ -2589,6 +2589,14 @@ const DEFAULT_SETTINGS = {
   douyinAspectFit: true,
   douyinCookieHeader: "",
   douyinCookieAt: 0,
+  favFolder: "抖音收藏",
+  favAttachFolder: "抖音收藏/附件",
+  favMode: "light",
+  favLimit: 20,
+  favPageDelayMin: 6,
+  favPageDelayMax: 12,
+  favAutoSync: false,
+  favLastSync: 0,
 };
 
 /* ============================ 播放器视图 ============================ */
@@ -3600,6 +3608,145 @@ class VideoPlayerView extends ItemView {
 
 /* ============================ 设置页 ============================ */
 
+/* ============================ 抖音收藏同步面板 ============================ */
+
+class DouyinFavSyncModal extends Modal {
+  constructor(app, plugin, opts) {
+    super(app);
+    this.plugin = plugin;
+    this.opts = opts || {};
+    this.stopped = false;
+    this.wv = null;
+  }
+
+  onOpen() {
+    this.titleEl.setText("同步抖音收藏");
+    const wrap = this.contentEl.createDiv({ cls: "vns-fav-wrap" });
+    this.statusEl = wrap.createDiv({ cls: "vns-fav-status", text: "正在打开抖音收藏页…" });
+    this.hintEl = wrap.createDiv({ cls: "vns-fav-hint", text: "这个窗口用来读取你的收藏：如果没登录，直接在这里登录（扫码/账号），登录状态会保留，下次不用再登。" });
+    const frame = wrap.createDiv({ cls: "vns-fav-frame" });
+    this.wv = document.createElement("webview");
+    this.wv.setAttribute("partition", DOUYIN_PARTITION);
+    this.wv.setAttribute("src", "https://www.douyin.com/user/self?showTab=favorite_collection");
+    this.wv.setAttribute("webpreferences", "backgroundThrottling=false");
+    this.wv.className = "vns-webview";
+    frame.appendChild(this.wv);
+    const actions = wrap.createDiv({ cls: "vns-fav-actions" });
+    this.stopBtn = actions.createEl("button", { text: "停止" });
+    this.stopBtn.onclick = () => { this.stopped = true; this.setStatus("已停止"); };
+    this.openBtn = actions.createEl("button", { text: "打开收藏文件夹" });
+    this.openBtn.onclick = () => this.plugin.app.workspace.openLinkText(this.plugin.settings.favFolder || "抖音收藏", "", false);
+    this.logEl = wrap.createDiv({ cls: "vns-fav-log" });
+
+    this.run().catch((e) => {
+      this.setStatus(`同步失败：${e.message}`);
+      this.log(`❌ ${e.message}`);
+    });
+  }
+
+  onClose() {
+    this.stopped = true;
+    try { if (this.wv) this.wv.remove(); } catch (e) { /* ignore */ }
+    this.wv = null;
+    this.contentEl.empty();
+  }
+
+  setStatus(text) { if (this.statusEl) this.statusEl.setText(text); }
+
+  log(text) {
+    if (!this.logEl) return;
+    this.logEl.createDiv({ text });
+    this.logEl.scrollTop = this.logEl.scrollHeight;
+  }
+
+  async run() {
+    const p = this.plugin;
+    const limit = Math.max(1, Math.min(200, parseInt(this.opts.limit || p.settings.favLimit, 10) || 20));
+    const mode = this.opts.mode || (p.settings.favMode === "heavy" ? "heavy" : "light");
+    const dmin = Math.max(1, Number(p.settings.favPageDelayMin) || 6);
+    const dmax = Math.max(dmin, Number(p.settings.favPageDelayMax) || 12);
+
+    this.setStatus("等待抖音页面就绪（首次可能需要在下方窗口登录）…");
+    const ready = await p.waitFavSigner(this.wv, 60000);
+    if (!ready) {
+      this.setStatus("抖音页面没就绪：请在下方的窗口里登录一次，然后关闭本窗口重新点「同步抖音收藏」");
+      return;
+    }
+    this.log("✅ 页面就绪，开始读取收藏列表");
+    const index = await p.loadFavIndex();
+    let cursor = 0;
+    let imported = 0;
+    let skipped = 0;
+    let failed = 0;
+    let pages = 0;
+    let riskHits = 0;
+
+    while (!this.stopped && imported < limit && pages < 40) {
+      pages += 1;
+      this.setStatus(`读取第 ${pages} 页…（新增 ${imported} / 跳过 ${skipped}）`);
+      const need = Math.min(20, Math.max(1, limit - imported));
+      const res = await p.fetchDouyinFavPage(this.wv, cursor, need);
+      if (!res || !res.ok) {
+        if (res && res.blocked && riskHits < 2) {
+          riskHits += 1;
+          this.log(`⚠️ 被风控拦了（第 ${riskHits} 次），等 30 秒再试…`);
+          await new Promise((r) => setTimeout(r, 30000));
+          continue;
+        }
+        this.log(`❌ 第 ${pages} 页读取失败：${(res && (res.err || res.status)) || "未知错误"}`);
+        if (res && res.err && /webSignUrl/.test(res.err)) {
+          this.setStatus("页面还没登录或没加载完，请在上面的窗口登录后重试");
+        }
+        break;
+      }
+      const items = res.items || [];
+      if (pages === 1 && res.total) this.log(`📚 收藏夹共 ${res.total} 条`);
+      if (!items.length) {
+        this.log("🈳 没有更多收藏了" + (pages === 1 ? "（如果确实有收藏，可能是没登录）" : ""));
+        break;
+      }
+      for (const item of items) {
+        if (this.stopped || imported >= limit) break;
+        if (!item || !item.id) continue;
+        if (index[item.id]) {
+          const exists = p.app.vault.getAbstractFileByPath(index[item.id]);
+          if (exists) { skipped += 1; continue; }
+          delete index[item.id];
+        }
+        try {
+          this.setStatus(`转换 ${imported + 1}/${limit}：${String(item.desc || item.id).replace(/\n/g, " ").slice(0, 30)}`);
+          const path = await p.importFavItem(item, mode, {
+            summarize: p.settings.autoSummarize,
+            transcribe: mode === "heavy",
+          });
+          index[item.id] = path;
+          await p.saveFavIndex(index);
+          imported += 1;
+          this.log(`✅ ${path}`);
+        } catch (e) {
+          failed += 1;
+          this.log(`❌ ${item.id}：${e.message}`);
+        }
+      }
+      if (!res.hasMore || !res.cursor) break;
+      cursor = res.cursor;
+      if (!this.stopped && imported < limit) {
+        const wait = Math.round((dmin + Math.random() * (dmax - dmin)) * 1000);
+        this.setStatus(`翻页前等待 ${Math.round(wait / 1000)} 秒（避免风控）…`);
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
+
+    const parts = [`新增 ${imported} 篇`];
+    if (skipped) parts.push(`跳过 ${skipped} 篇`);
+    if (failed) parts.push(`失败 ${failed} 篇`);
+    this.setStatus(`✅ 完成：${parts.join("，")}`);
+    p.settings.favLastSync = Date.now();
+    try { await p.saveSettings(); } catch (e) { /* ignore */ }
+    if (imported) new Notice(`抖音收藏：新增 ${imported} 篇笔记`, 8000);
+  }
+}
+
 class VnsSettingTab extends PluginSettingTab {
   constructor(app, plugin) { super(app, plugin); this.plugin = plugin; }
 
@@ -3680,6 +3827,41 @@ class VnsSettingTab extends PluginSettingTab {
         await this.plugin.saveSettings();
         this.display();
       }));
+    containerEl.createEl("h4", { text: "抖音收藏同步" });
+    new Setting(containerEl).setName("收藏笔记目录").setDesc("每一条收藏生成一篇笔记，放在这个目录")
+      .addText((t) => t.setPlaceholder("抖音收藏").setValue(this.plugin.settings.favFolder || "抖音收藏")
+        .onChange(async (v) => { this.plugin.settings.favFolder = v.trim() || "抖音收藏"; await this.plugin.saveSettings(); }));
+    new Setting(containerEl).setName("附件目录").setDesc("封面、配图、视频放这里（heavy 模式会下载视频）")
+      .addText((t) => t.setPlaceholder("抖音收藏/附件").setValue(this.plugin.settings.favAttachFolder || "抖音收藏/附件")
+        .onChange(async (v) => { this.plugin.settings.favAttachFolder = v.trim() || "抖音收藏/附件"; await this.plugin.saveSettings(); }));
+    new Setting(containerEl).setName("同步模式").setDesc("轻量：文案 + 封面 + 链接；重量：再下载视频并做本地转录（慢，占用空间）")
+      .addDropdown((d) => d
+        .addOption("light", "轻量：文案 + 封面")
+        .addOption("heavy", "重量：下载视频 + 转录")
+        .setValue(this.plugin.settings.favMode || "light")
+        .onChange(async (v) => { this.plugin.settings.favMode = v; await this.plugin.saveSettings(); }));
+    new Setting(containerEl).setName("每次同步条数").setDesc("一次最多转换多少条收藏（1-200），已转换过的会自动跳过")
+      .addText((t) => t.setValue(String(this.plugin.settings.favLimit || 20))
+        .onChange(async (v) => {
+          const n = Math.max(1, Math.min(200, parseInt(v, 10) || 20));
+          this.plugin.settings.favLimit = n;
+          await this.plugin.saveSettings();
+        }));
+    new Setting(containerEl).setName("翻页间隔（秒）").setDesc("两页之间随机等待，太短容易触发风控")
+      .addText((t) => t.setValue(String(this.plugin.settings.favPageDelayMin || 6))
+        .onChange(async (v) => { this.plugin.settings.favPageDelayMin = Math.max(1, parseInt(v, 10) || 6); await this.plugin.saveSettings(); }))
+      .addText((t) => t.setValue(String(this.plugin.settings.favPageDelayMax || 12))
+        .onChange(async (v) => { this.plugin.settings.favPageDelayMax = Math.max(1, parseInt(v, 10) || 12); await this.plugin.saveSettings(); }));
+    new Setting(containerEl).setName("启动时自动同步").setDesc("开启后，Obsidian 启动时如果距上次同步超过 12 小时，就自动跑一次（会弹出同步窗口）")
+      .addToggle((t) => t.setValue(!!this.plugin.settings.favAutoSync)
+        .onChange(async (v) => { this.plugin.settings.favAutoSync = v; await this.plugin.saveSettings(); }));
+    const favNow = new Setting(containerEl).setName("立即同步").setDesc("打开收藏同步面板，可先在里面登录抖音")
+      .addButton((b) => b.setButtonText("同步收藏").setCta().onClick(() => this.plugin.openFavSync()));
+    this.plugin.loadFavIndex().then((idx) => {
+      const n = Object.keys(idx || {}).length;
+      const at = this.plugin.settings.favLastSync ? new Date(this.plugin.settings.favLastSync).toLocaleString() : "从未";
+      favNow.setDesc(`已同步 ${n} 条 ｜ 上次同步：${at} ｜ 打开面板后可在窗口里登录抖音`);
+    }).catch(() => {});
     new Setting(containerEl).setName("测试本地转录").setDesc("检查 Python、faster-whisper 与 asr_bridge.py 是否就位")
       .addButton((b) => b.setButtonText("运行测试").onClick(async () => {
         b.setDisabled(true);
@@ -4160,7 +4342,7 @@ class DouyinCaptureModal extends Modal {
       this.statusEl.setText(`页面加载失败：${ev && ev.errorDescription}`);
     });
     this.wv.style.height = "72vh";
-    this.hardTimer = setTimeout(() => this.finish(null, "超时没抓到播放地址"), 45000);
+    this.hardTimer = setTimeout(() => this.finish(null, "超时75秒没抓到播放地址"), 80000);
   }
 
   afterReady() {
@@ -4170,21 +4352,39 @@ class DouyinCaptureModal extends Modal {
     const started = Date.now();
     const poll = async () => {
       if (this.done || !this.wv) return;
+      try {
+        await wv.executeJavaScript("(() => { const v = document.querySelector('video'); if (v && v.paused) { v.muted = true; const p = v.play(); if (p && p.catch) p.catch(() => {}); } return 1; })()", true);
+      } catch (e) { /* ignore */ }
       if (this.opts.cookieOnly && Date.now() - started > 4000) {
         const cookie = await this.plugin.harvestDouyinCookies(wv).catch(() => "");
         this.finish({ cookie, mediaUrl: "" });
         return;
       }
       const st = await this.plugin.readDouyinState(wv);
+      const media = st ? this.plugin.pickDouyinMedia(st) : "";
+      const picked = media && /^https?:/i.test(media) ? media : "";
+      this.dbg = {
+        elapsedMs: Date.now() - started,
+        href: (st && st.href) || "",
+        title: (st && st.title) || "",
+        hasVideo: !!(st && st.hasVideo),
+        paused: !!(st && st.paused),
+        src: (st && st.src) || "",
+        dur: (st && st.dur) || 0,
+        routerPlay: (st && st.routerPlay) || [],
+        res: ((st && st.mediaUrls) || []).slice(-4),
+        picked,
+        notFound: !!(st && st.notFound),
+      };
       if (st && st.notFound) {
         this.finish(null, "抖音说这个视频不存在（可能已删除/仅自己可见）");
         return;
       }
-      if (st && st.src) {
+      if (picked) {
         const cookie = await this.plugin.harvestDouyinCookies(wv).catch(() => "");
         this.plugin.settings.douyinCookieAt = Date.now();
         this.finish({
-          mediaUrl: st.src,
+          mediaUrl: picked,
           duration: Math.round(st.dur || 0),
           title: (st.desc || "").trim() || (st.title || "").replace(/\s*-\s*抖音.*$/, "").trim(),
           desc: (st.desc || "").trim(),
@@ -4199,7 +4399,11 @@ class DouyinCaptureModal extends Modal {
         });
         return;
       }
-      if (Date.now() - started > 40000) { this.finish(null, "没抓到播放地址（试试在窗口里登录后再来）"); return; }
+      if (Date.now() - started > 75000) {
+        const cookie = await this.plugin.harvestDouyinCookies(wv).catch(() => "");
+        this.finish({ mediaUrl: "", cookie }, "75秒没抓到播放地址（试试在窗口里登录/点播放后再来）");
+        return;
+      }
       this.statusEl.setText(st && st.hasVideo
         ? "检测到播放器，等它开始播放…（点一下窗口里的播放键会更快）"
         : "页面已加载，正在等待播放器…");
@@ -4211,6 +4415,17 @@ class DouyinCaptureModal extends Modal {
   finish(result, tip) {
     if (this.done) return;
     this.done = true;
+    try {
+      const fsx = require("fs");
+      fsx.writeFileSync(require("path").join(require("os").tmpdir(), "vns-douyin-capture.json"),
+        JSON.stringify({
+          at: new Date().toISOString(),
+          url: (this.link && this.link.url) || "",
+          tip: tip || "",
+          mediaUrl: (result && result.mediaUrl) || "",
+          dbg: this.dbg || null,
+        }, null, 2));
+    } catch (e) { console.debug("[vns] 抓取调试写入失败", e.message); }
     if (this.timer) clearTimeout(this.timer);
     if (this.hardTimer) clearTimeout(this.hardTimer);
     const cb = this.onDone;
@@ -4246,11 +4461,13 @@ class VideoNoteStudio extends Plugin {
     this.registerObsidianProtocolHandler("vns", (params) => this.handleVnsProtocol(params));
     this.setupBiliReferer();
     this.bridgePath = this.resolveBridgePath();
+    this.ensureBridgeFile();
     this.registerSourceClick();
     this.registerEvent(this.app.workspace.on("file-open", (file) => {
       this.maybeAutoOpenPlayer(file).catch((e) => console.debug("[vns] 自动打开播放器失败", e));
     }));
     this.addRibbonIcon("play-circle", "打开视频播放器", () => this.openPlayer());    this.addSettingTab(new VnsSettingTab(this.app, this));
+    this.addRibbonIcon("bookmark", "同步抖音收藏到笔记", () => { this.recordHabit("sync-douyin-fav"); this.openFavSync(); });
 
     const cmd = (id, name, fn) => this.addCommand({ id, name, callback: () => { this.recordHabit(id); Promise.resolve(fn()).catch((e) => this.fail(e)); } });
 
@@ -4268,12 +4485,16 @@ class VideoNoteStudio extends Plugin {
     cmd("distill-book", "拆书：书籍转章节笔记", () => this.distillBookPrompt());
     cmd("enrich-clippings", "补全 Clippings 里的视频剪藏", () => this.enrichClippings());
     cmd("write-habits", "生成使用习惯笔记", () => this.writeHabitNote());
+    cmd("sync-douyin-fav", "抖音：同步收藏到笔记", () => this.openFavSync());
     cmd("douyin-cookie", "抖音：打开页面抓取 Cookie", async () => {
       const r = await this.probeDouyinCookies();
       new Notice(r && r.cookie ? `抖音 Cookie 已更新（${this.douyinCookieInfo()}）` : "没抓到 Cookie，试试在窗口里登录一次", 8000);
     });
 
-    this.app.workspace.onLayoutReady(() => this.rebuildIndex());
+    this.app.workspace.onLayoutReady(() => {
+      this.rebuildIndex();
+      this.maybeAutoSyncFavorites();
+    });
     this.registerEvent(this.app.vault.on("rename", (f, old) => this.reindexFile(f, old)));
   }
 
@@ -4304,6 +4525,32 @@ class VideoNoteStudio extends Plugin {
       return candidates[0] || "";
     } catch (e) {
       console.debug("[vns] 解析 bridge 路径失败", e);
+      return "";
+    }
+  }
+
+  /**
+   * 用内嵌的 asr_bridge.py 覆盖磁盘上的旧副本。
+   * 社区插件更新只会下载 main.js/manifest/styles，不会带 asr_bridge.py，
+   * 旧副本留在插件目录里就会和新 main.js 传的参数对不上（例如 --media-url）。
+   */
+  ensureBridgeFile() {
+    const p = this.bridgePath;
+    if (!p) return "";
+    try {
+      const fs = require("fs");
+      const nodePath = require("path");
+      const embedded = Buffer.from(ASR_BRIDGE_B64, "base64").toString("utf8");
+      let cur = "";
+      try { cur = fs.readFileSync(p, "utf8"); } catch (e) { cur = ""; }
+      if (cur !== embedded) {
+        fs.mkdirSync(nodePath.dirname(p), { recursive: true });
+        fs.writeFileSync(p, embedded, "utf8");
+        console.debug("[vns] asr_bridge.py 已同步到内嵌版本（旧副本被替换）");
+      }
+      return p;
+    } catch (e) {
+      console.debug("[vns] 同步 asr_bridge.py 失败", e);
       return "";
     }
   }
@@ -4502,7 +4749,10 @@ class VideoNoteStudio extends Plugin {
   }
 
   async handleVnsProtocol(params) {
+    if (params && params.cmd === "favsync") { this.openFavSync({ limit: parseInt(params.l || "0", 10) || undefined, mode: params.mode || undefined }); return; }
+    if (params && params.cmd === "fav") { await this.runDouyinFavDiag(params); return; }
     if (params && params.cmd === "diag") { await this.runDouyinDiag(); return; }
+    if (params && params.cmd === "import" && params.u) { await this.importLink(params.u); return; }
     const u = (params && params.u) || "";
     const t = Math.max(0, parseInt((params && params.t) || "0", 10) || 0);
     if (!u) return;
@@ -4519,12 +4769,102 @@ class VideoNoteStudio extends Plugin {
     if (t > 0) new Notice(`已跳转到 ${fmtTime(t)}`, 2000);
   }
 
-  async runDouyinDiag() {
-    const out = { at: new Date().toISOString(), steps: [] };
+  /** 抖音收藏诊断：验证 window.use('webSignUrl') 出签 + listcollection 接口 */
+  async runDouyinFavDiag(params) {
+    const out = { at: new Date().toISOString(), codeVersion: "fav-diag-r1" };
     const modal = new Modal(this.app);
     const wv = document.createElement("webview");
     wv.setAttribute("partition", DOUYIN_PARTITION);
-    wv.setAttribute("src", "https://www.douyin.com/video/7298145681699622182");
+    wv.setAttribute("src", "https://www.douyin.com/user/self?showTab=favorite_collection");
+    wv.style.width = "100%";
+    wv.style.height = "100%";
+    modal.onOpen = () => {
+      modal.contentEl.addClass("vns-douyin-modal");
+      modal.contentEl.createEl("h3", { text: "抖音收藏诊断" });
+      const box = modal.contentEl.createDiv({ cls: "vns-douyin-frame" });
+      box.appendChild(wv);
+    };
+    modal.onClose = () => { try { wv.remove(); } catch (e) { /* ignore */ } modal.contentEl.empty(); };
+    modal.open();
+    const script = `(async () => {
+  const out = {};
+  try {
+    out.href = location.href;
+    out.useType = typeof window.use;
+    const fn = window.use && window.use('webSignUrl');
+    out.signType = typeof fn;
+    let webid = '';
+    try { const s = JSON.parse(localStorage.getItem('SysInfo') || '{}'); if (s && s.webid) webid = String(s.webid); } catch (e) {}
+    if (!webid) { try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf('__tea_cache_tokens_') === 0) { const v = JSON.parse(localStorage.getItem(k) || '{}'); if (v && v.user_unique_id) { webid = String(v.user_unique_id); break; } } } } catch (e) {} }
+    out.webid = webid;
+    const ck = (document.cookie || '').split('; ');
+    const uifid = ((ck.filter((x) => x.indexOf('UIFID=') === 0)[0] || '').slice(6));
+    out.uifidLen = uifid.length;
+    const p = {
+      device_platform: 'webapp', aid: '6383', channel: 'channel_pc_web',
+      publish_video_strategy_type: '2', pc_client_type: '1', pc_libra_divert: 'Windows',
+      update_version_code: '170400', support_h265: '1', support_dash: '1',
+      version_code: '170400', version_name: '17.4.0', cookie_enabled: 'true',
+      screen_width: String(window.screen.width), screen_height: String(window.screen.height),
+      browser_language: navigator.language || 'zh-CN', browser_platform: navigator.platform || 'Win32',
+      browser_name: 'Chrome', browser_version: '131.0.0.0', browser_online: String(navigator.onLine),
+      engine_name: 'Blink', engine_version: '131.0.0.0', os_name: 'Windows', os_version: '10',
+      cpu_core_num: String(navigator.hardwareConcurrency || 8), device_memory: String(navigator.deviceMemory || 8),
+      platform: 'PC', downlink: '10', effective_type: '4g', round_trip_time: '200'
+    };
+    if (webid) p.webid = webid;
+    if (uifid) p.uifid = uifid;
+    const qs = Object.keys(p).map((k) => encodeURIComponent(k) + '=' + encodeURIComponent(p[k])).join('&');
+    const base = 'https://www.douyin.com/aweme/v1/web/aweme/listcollection/?' + qs;
+    out.baseLen = base.length;
+    out.res = (performance.getEntriesByType('resource') || []).map((e) => e.name).filter((u) => u.indexOf('/aweme/v1/web/') >= 0).slice(0, 6);
+    let signed = base;
+    if (typeof fn === 'function') {
+      try { const o = await fn(base); out.signOutType = typeof o; out.signOut = JSON.stringify(o).slice(0, 300); signed = (o && o.url) || (typeof o === 'string' ? o : base); }
+      catch (e) { out.signErr = String((e && e.message) || e); }
+    }
+    out.signed = (typeof signed === 'string') && signed.indexOf('a_bogus=') > 0;
+    out.signedHead = String(signed).slice(-160);
+    const candidates = [
+      'https://www.douyin.com/aweme/v1/web/aweme/listcollection/',
+      'https://www.douyin.com/aweme/v1/web/aweme/listcollection',
+      'https://www.douyin.com/aweme/v1/web/favorite/collect/list/'
+    ];
+    out.tries = [];
+    for (const c of candidates) {
+      const suffix = String(signed).indexOf('?') > 0 ? String(signed).slice(String(signed).indexOf('?')) : '';
+      const u = c + suffix;
+      try {
+        const r = await fetch(u, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-secsdk-csrf-token': 'DOWNGRADE' }, body: 'count=10&cursor=0' });
+        const t = await r.text();
+        const row = { ep: c, status: r.status, len: t.length, head: t.slice(0, 200) };
+        try { const j = JSON.parse(t); const list = j.aweme_list || []; row.items = list.length; row.more = j.has_more; row.cursor = j.cursor; } catch (e) { row.parseErr = String((e && e.message) || e); }
+        out.tries.push(row);
+      } catch (e) { out.tries.push({ ep: c, err: String((e && e.message) || e) }); }
+    }
+  } catch (e) { out.fatal = String((e && e.message) || e); }
+  return JSON.stringify(out);
+})()`;
+    setTimeout(async () => {
+      try {
+        out.raw = await wv.executeJavaScript(script, true);
+      } catch (e) { out.error = String((e && e.message) || e); }
+      try {
+        const fsx = require("fs");
+        fsx.writeFileSync(require("path").join(require("os").tmpdir(), "vns-fav-diag.json"), JSON.stringify(out, null, 2));
+      } catch (e) { console.debug("[vns] 收藏诊断写入失败", e.message); }
+      try { modal.close(); } catch (e) { /* ignore */ }
+    }, 14000);
+  }
+
+  async runDouyinDiag(params) {
+    const out = { at: new Date().toISOString(), codeVersion: "diag-r3", steps: [] };
+    const target = (params && params.u) || "https://www.douyin.com/video/7298145681699622182";
+    const modal = new Modal(this.app);
+    const wv = document.createElement("webview");
+    wv.setAttribute("partition", DOUYIN_PARTITION);
+    wv.setAttribute("src", target);
+    out.target = target;
     wv.style.width = "100%";
     wv.style.height = "100%";
     modal.onOpen = () => {
@@ -4548,6 +4888,33 @@ class VideoNoteStudio extends Plugin {
         out.text = String(await js("((document.body && document.body.innerText) || '').slice(0, 500)"));
         out.videos = await js("document.querySelectorAll('video').length");
         out.vsrc = await js("(() => { const v = document.querySelector('video'); return v ? (v.currentSrc || v.src || '') : ''; })()");
+        out.hasRouterData = await js("!!window._ROUTER_DATA");
+        out.routerPlay = await js(`(() => {
+          try {
+            const rd = window._ROUTER_DATA;
+            if (!rd) return [];
+            const found = (JSON.stringify(rd).match(/https?:\\/\\/[^" ]+/g) || []);
+            return found.filter((u) => /(douyinvod|bytecdn|byteoversea|aweme\\.com)/i.test(u)).slice(0, 6);
+          } catch (e) { return ["ERR " + e.message]; }
+        })()`);
+        out.resMedia = await js(`(performance.getEntriesByType('resource') || []).map((e) => e.name)
+          .filter((u) => /(douyinvod|bytecdn|byteoversea|\\.mp4|\\.m4s|\\.m3u8)/i.test(u)).slice(-10)`);
+        out.globals = await js(`Object.keys(window).filter((k) => /aweme|douyin|render|router|initial|pace|__P|_SSR/i.test(k)).slice(0, 40)`);
+        out.htmlLen = await js("(document.documentElement.innerHTML || '').length");
+        out.htmlHits = await js(`(() => {
+          const h = document.documentElement.innerHTML || '';
+          const m = h.match(/https?:[^"' ]*(?:douyinvod|bytecdn|byteoversea)[^"' ]*/g) || [];
+          return m.slice(0, 5);
+        })()`);
+        out.playApi = await js(`(async () => {
+          try {
+            const id = (location.href.match(/video\\/(\\d+)/) || [])[1] || '';
+            const r = await fetch('https://www.douyin.com/aweme/v1/web/aweme/detail/?device_platform=webapp&aid=6383&channel=channel_pc_web&aweme_id=' + id, { credentials: 'include' });
+            const t = await r.text();
+            const hit = (t.match(/https?:[^"\\\\ ]*(?:douyinvod|bytecdn)[^"\\\\ ]*/g) || []);
+            return { status: r.status, len: t.length, head: t.slice(0, 160), media: hit.slice(0, 3) };
+          } catch (e) { return { error: String((e && e.message) || e) }; }
+        })()`);
         out.docCookie = String(await js("document.cookie") || "").slice(0, 300);
         if (typeof wv.getWebContents === "function") {
           const wc = wv.getWebContents();
@@ -4570,6 +4937,278 @@ class VideoNoteStudio extends Plugin {
     };
     setTimeout(() => { dump(); }, 9000);
     setTimeout(() => { try { modal.close(); } catch (e) { /* ignore */ } }, 40000);
+  }
+
+  /* ---------- 抖音收藏同步 ---------- */
+  favIndexPath() { return ".vns/douyin-favorites.json"; }
+
+  async loadFavIndex() {
+    try {
+      const adapter = this.app.vault.adapter;
+      if (!(await adapter.exists(this.favIndexPath()))) return {};
+      const data = JSON.parse((await adapter.read(this.favIndexPath())) || "{}");
+      return data && typeof data === "object" ? data : {};
+    } catch (e) { return {}; }
+  }
+
+  async saveFavIndex(index) {
+    try {
+      const adapter = this.app.vault.adapter;
+      if (!(await adapter.exists(".vns"))) await adapter.mkdir(".vns");
+      await adapter.write(this.favIndexPath(), JSON.stringify(index));
+    } catch (e) { console.debug("[vns] 收藏索引保存失败", e.message); }
+  }
+
+  openFavSync(opts) { new DouyinFavSyncModal(this.app, this, opts || {}).open(); }
+
+  /** 启动时按需自动同步一次（默认关闭；距上次超过 12 小时才跑） */
+  maybeAutoSyncFavorites() {
+    if (!this.settings.favAutoSync) return;
+    const last = Number(this.settings.favLastSync) || 0;
+    if (Date.now() - last < 12 * 3600 * 1000) return;
+    setTimeout(() => {
+      try { this.openFavSync(); } catch (e) { console.debug("[vns] 自动同步收藏失败", e.message); }
+    }, 8000);
+  }
+
+  /** 等页面里的 window.use('webSignUrl') 可用（抖音内部出签接口） */
+  async waitFavSigner(wv, timeoutMs) {
+    const deadline = Date.now() + (timeoutMs || 45000);
+    while (Date.now() < deadline) {
+      try {
+        const ok = await wv.executeJavaScript("typeof (window.use && window.use('webSignUrl')) === 'function'", true);
+        if (ok) return true;
+      } catch (e) { /* 页面还没就绪 */ }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    return false;
+  }
+
+  /** 在收藏页上下文里出一页签名请求（webSignUrl + listcollection） */
+  async fetchDouyinFavPage(wv, cursor, count) {
+    const n = Math.max(1, Math.min(20, parseInt(count, 10) || 20));
+    const c = Math.max(0, parseInt(cursor, 10) || 0);
+    const script = `(async () => {
+  const out = { ok: false };
+  try {
+    const fn = window.use && window.use('webSignUrl');
+    if (typeof fn !== 'function') { out.err = 'webSignUrl 不可用（页面可能没登录或未加载完）'; return JSON.stringify(out); }
+    let webid = '';
+    try { const s = JSON.parse(localStorage.getItem('SysInfo') || '{}'); if (s && s.webid) webid = String(s.webid); } catch (e) {}
+    if (!webid) { try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf('__tea_cache_tokens_') === 0) { const v = JSON.parse(localStorage.getItem(k) || '{}'); if (v && v.user_unique_id) { webid = String(v.user_unique_id); break; } } } } catch (e) {} }
+    const ck = (document.cookie || '').split('; ');
+    const uifid = ((ck.filter((x) => x.indexOf('UIFID=') === 0)[0] || '').slice(6));
+    const p = {
+      device_platform: 'webapp', aid: '6383', channel: 'channel_pc_web',
+      publish_video_strategy_type: '2', pc_client_type: '1', pc_libra_divert: 'Windows',
+      update_version_code: '170400', support_h265: '1', support_dash: '1',
+      version_code: '170400', version_name: '17.4.0', cookie_enabled: 'true',
+      screen_width: String(window.screen.width), screen_height: String(window.screen.height),
+      browser_language: navigator.language || 'zh-CN', browser_platform: navigator.platform || 'Win32',
+      browser_name: 'Chrome', browser_version: '131.0.0.0', browser_online: String(navigator.onLine),
+      engine_name: 'Blink', engine_version: '131.0.0.0', os_name: 'Windows', os_version: '10',
+      cpu_core_num: String(navigator.hardwareConcurrency || 8), device_memory: String(navigator.deviceMemory || 8),
+      platform: 'PC', downlink: '10', effective_type: '4g', round_trip_time: '200'
+    };
+    if (webid) p.webid = webid;
+    if (uifid) p.uifid = uifid;
+    const qs = Object.keys(p).map((k) => encodeURIComponent(k) + '=' + encodeURIComponent(p[k])).join('&');
+    const base = 'https://www.douyin.com/aweme/v1/web/aweme/listcollection?' + qs;
+    let url = base;
+    try { const o = await fn(base); url = (o && o.url) || base; } catch (e) { out.signErr = String((e && e.message) || e); }
+    const r = await fetch(url, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-secsdk-csrf-token': 'DOWNGRADE' }, body: 'count=${n}&cursor=${c}' });
+    const t = await r.text();
+    out.status = r.status;
+    if (r.status === 403 || String(t).trim() === 'blocked') { out.blocked = true; return JSON.stringify(out); }
+    let j = null;
+    try { j = JSON.parse(t); } catch (e) { out.err = '返回不是 JSON（status ' + r.status + '）：' + String(t).slice(0, 120); return JSON.stringify(out); }
+    const list = j.aweme_list || [];
+    out.hasMore = !!j.has_more;
+    out.cursor = Number(j.cursor || 0);
+    out.total = j.total || 0;
+    out.items = list.map((it) => {
+      const v = it.video || {};
+      const cover = (((v.cover || {}).url_list) || [])[0] || ((((v.origin_cover || {}).url_list) || [])[0]) || '';
+      const play = (((v.play_addr || {}).url_list) || [])[0] || '';
+      const br = ((v.bit_rate || [])[0] || {});
+      const playHi = ((((br.play_addr || {}).url_list) || [])[0]) || play;
+      const imgs = (it.images || []).map((im) => (((im.url_list) || [])[0] || '')).filter(Boolean);
+      const dur = Number(v.duration || 0);
+      return {
+        id: String(it.aweme_id || ''),
+        desc: String(it.desc || ''),
+        author: String(((it.author || {}).nickname) || ''),
+        time: Number(it.create_time || 0),
+        dur: Math.round(dur > 1000 ? dur / 1000 : dur),
+        cover: cover,
+        play: playHi,
+        imgs: imgs,
+        type: (imgs.length ? 'image' : 'video'),
+        digg: Number(((it.statistics || {}).digg_count) || 0),
+        comment: Number(((it.statistics || {}).comment_count) || 0),
+        collect: Number(((it.statistics || {}).collect_count) || 0)
+      };
+    });
+    out.ok = true;
+  } catch (e) { out.err = String((e && e.message) || e); }
+  return JSON.stringify(out);
+})()`;
+    let raw = "";
+    try { raw = await wv.executeJavaScript(script, true); } catch (e) { return { ok: false, err: String((e && e.message) || e) }; }
+    try { return JSON.parse(raw); } catch (e) { return { ok: false, err: `返回无法解析：${String(raw).slice(0, 120)}` }; }
+  }
+
+  /** 收藏条目标题：取文案首行（去掉 @ 和话题），没有就用作者+ID */
+  favTitle(item) {
+    const first = String(item.desc || "").split("\n").map((s) => s.trim()).filter(Boolean)[0] || "";
+    let clean = first
+      .replace(/#[^\s#]+/g, "")
+      .replace(/@[^\s@]+/g, "")
+      .replace(/\[[^\]]*R\]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    // 取第一个句读之前，避免标题是半句话
+    const m = clean.match(/^(.{6,40}?)[。！？!?，,｜|；;]/);
+    if (m && m[1].trim().length >= 6) clean = m[1].trim();
+    clean = clean.replace(/[。，、；：,;:]+$/, "").trim();
+    if (clean.length > 36) clean = clean.slice(0, 36).replace(/[^\u4e00-\u9fa5A-Za-z0-9]+$/, "");
+    if (clean.length >= 4) return clean;
+    const day = item.time ? new Date(item.time * 1000).toISOString().slice(0, 10) : "";
+    return `${item.author || "抖音"}${day ? ` ${day}` : ""}`.trim();
+  }
+
+  favTags(item) {
+    const found = String(item.desc || "").match(/#[^\s#]+/g) || [];
+    const out = [];
+    for (const raw of found) {
+      const t = raw.slice(1).replace(/[^\p{L}\p{N}_-]/gu, "").slice(0, 20);
+      if (t.length >= 2 && !out.includes(t)) out.push(t);
+      if (out.length >= 8) break;
+    }
+    return out;
+  }
+
+  favNum(n) {
+    const v = Number(n) || 0;
+    if (v >= 100000000) return `${(v / 100000000).toFixed(1)}亿`;
+    if (v >= 10000) return `${(v / 10000).toFixed(1)}万`;
+    return String(v);
+  }
+
+  /** 下载远程二进制到 vault（已存在则跳过） */
+  async ensureFavBinary(url, relPath, referer) {
+    try {
+      const adapter = this.app.vault.adapter;
+      if (await adapter.exists(relPath)) return true;
+      const res = await requestUrl({
+        url, method: "GET", throw: false,
+        headers: {
+          Referer: referer || "https://www.douyin.com/",
+          "User-Agent": VNS_UA_MOBILE,
+        },
+      });
+      const buf = res.arrayBuffer;
+      if (res.status >= 400 || !buf || !buf.byteLength) return false;
+      const dir = relPath.slice(0, relPath.lastIndexOf("/"));
+      if (dir && !(await adapter.exists(dir))) await adapter.mkdir(dir);
+      if (typeof adapter.writeBinary === "function") await adapter.writeBinary(relPath, buf);
+      else await this.app.vault.createBinary(relPath, buf);
+      return true;
+    } catch (e) {
+      console.debug("[vns] 收藏附件下载失败", url, e.message);
+      return false;
+    }
+  }
+
+  buildFavNote(item, extra) {
+    const url = `https://www.douyin.com/video/${item.id}`;
+    const fm = ["---", "type: douyin", `content_type: ${item.type}`, `douyin_id: "${item.id}"`,
+      `author: "${String(item.author || "").replace(/"/g, "'")}"`, `source: ${url}`];
+    if (item.time) {
+      const d = new Date(item.time * 1000);
+      fm.push(`create_time: "${d.toISOString().slice(0, 16).replace("T", " ")}"`);
+    }
+    fm.push("favorite: true", `synced: ${new Date().toISOString().slice(0, 10)}`, "tags:", "  - douyin", "  - douyin-favorite");
+    for (const t of this.favTags(item)) fm.push(`  - ${t}`);
+    fm.push("---", "");
+
+    const body = [`# ${extra.title}`, ""];
+    if (extra.videoRel) body.push(`![[${extra.videoRel}]]`, "");
+    else if (extra.coverRel) body.push(`![[${extra.coverRel}]]`, "");
+    else if (item.cover) body.push(`![封面](${item.cover})`, "");
+
+    const meta = [];
+    if (item.author) meta.push(`作者 @${item.author}`);
+    if (item.time) meta.push(`发布于 ${new Date(item.time * 1000).toLocaleDateString()}`);
+    if (item.dur) meta.push(`时长 ${fmtTime(item.dur)}`);
+    const stat = [];
+    if (item.digg) stat.push(`👍 ${this.favNum(item.digg)}`);
+    if (item.comment) stat.push(`💬 ${this.favNum(item.comment)}`);
+    if (item.collect) stat.push(`⭐ ${this.favNum(item.collect)}`);
+    if (stat.length) meta.push(stat.join(" "));
+    body.push(`> [!note] 抖音收藏 ｜ ${meta.join(" ｜ ")}`, "");
+
+    if (item.desc) body.push("## 文案", "", String(item.desc).trim().slice(0, 4000), "");
+    if (extra.summary) {
+      const sp = splitSummary(extra.summary);
+      if (sp.points) body.push("## 要点", "", sp.points.trim(), "");
+    }
+    if (extra.imageRels && extra.imageRels.length) {
+      body.push("## 配图", "", ...extra.imageRels.map((r) => `![[${r}]]`), "");
+    }
+    if (extra.transcript && extra.transcript.length) {
+      body.push("## 时间戳", "");
+      for (const [t, s] of extra.transcript) {
+        body.push(`- [${fmtTime(t)}](obsidian://vns?u=${encodeURIComponent(url)}&t=${Math.floor(t)}) ${s}`);
+      }
+      body.push("");
+    }
+    return fm.join("\n") + body.join("\n");
+  }
+
+  /** 单条收藏 → 一篇笔记 */
+  async importFavItem(item, mode, opts) {
+    opts = opts || {};
+    const folder = this.settings.favFolder || "抖音收藏";
+    const attachRoot = this.settings.favAttachFolder || `${folder}/附件`;
+    const relBase = `${attachRoot}/${item.id}`;
+    const title = this.favTitle(item);
+    const url = `https://www.douyin.com/video/${item.id}`;
+    const ref = "https://www.douyin.com/";
+    await ensureFolder(this.app, folder);
+
+    const coverRel = item.cover && await this.ensureFavBinary(item.cover, `${relBase}/cover.jpg`, ref) ? `${relBase}/cover.jpg` : "";
+    const imageRels = [];
+    if (item.type === "image") {
+      for (let i = 0; i < item.imgs.length; i += 1) {
+        const rel = `${relBase}/${String(i + 1).padStart(2, "0")}.jpg`;
+        if (await this.ensureFavBinary(item.imgs[i], rel, ref)) imageRels.push(rel);
+      }
+    }
+
+    let transcript = [];
+    let videoRel = "";
+    if (mode === "heavy" && item.type === "video") {
+      const link = { kind: "douyin", id: item.id, url, mediaUrl: item.play || "", duration: item.dur };
+      if (item.play) {
+        const rel = `${relBase}/video.mp4`;
+        if (await this.ensureFavBinary(item.play, rel, ref)) videoRel = rel;
+      }
+      if (opts.transcribe && this.settings.asrEnabled) {
+        transcript = await this.localTranscript(link);
+      }
+    }
+
+    let summary = "";
+    const bodyText = transcript.length ? transcript.map((x) => x[1]).join("\n") : String(item.desc || "");
+    if (opts.summarize && this.hasLlm() && bodyText.trim().length > 40) {
+      try { summary = await this.summarize({ title, author: item.author }, bodyText); } catch (e) { console.debug("[vns] 收藏摘要失败", e.message); }
+    }
+
+    const md = this.buildFavNote(item, { title, coverRel, videoRel, imageRels, transcript, summary });
+    const path = uniquePath(this.app, folder, `${slug(item.author || "抖音")}-${slug(title)}`);
+    await this.app.vault.create(path, md);
+    return path;
   }
 
   pickLocalVideo(cb) { new LocalVideoSuggest(this.app, cb).open(); }
@@ -4814,6 +5453,7 @@ class VideoNoteStudio extends Plugin {
         vh: v ? v.videoHeight : 0,
         paused: v ? v.paused : true,
         title: document.title || '',
+        href: location.href || '',
         notFound: /视频不存在|作品已删除|内容不可见|已下架/.test(bodyText),
         desc: pick('[data-e2e="video-desc"]') || pick('h1'),
         author: pick('[data-e2e="user-info"] a') || pick('[data-e2e="video-author"]') || pick('.author-name'),
@@ -4825,7 +5465,20 @@ class VideoNoteStudio extends Plugin {
         mediaUrls: (performance.getEntriesByType('resource') || [])
           .map((e) => e.name)
           .filter((u) => /(\\.mp4|\\.m4s|\\.m3u8|douyinvod|bytecdn|byteoversea)/i.test(u))
-          .slice(-12)
+          .slice(-12),
+        routerPlay: (() => {
+          try {
+            const rd = window._ROUTER_DATA;
+            if (!rd) return [];
+            const found = (JSON.stringify(rd).match(/https?:\\/\\/[^" ]+/g) || []);
+            const seen = Object.create(null);
+            return found
+              .filter((u) => /(douyinvod|bytecdn|byteoversea|aweme\\.com)/i.test(u))
+              .filter((u) => /(\\.mp4|\\.m4s|\\.m3u8|media-video|media-audio)/i.test(u))
+              .filter((u) => (seen[u] ? false : (seen[u] = 1)))
+              .slice(0, 10);
+          } catch (e) { return []; }
+        })()
       });
     })()`;
     try {
@@ -4849,6 +5502,15 @@ class VideoNoteStudio extends Plugin {
     if (mp4) return mp4;
     const cdn = byExt(/douyinvod|bytecdn|byteoversea/i);
     if (cdn) return cdn;
+    // 兜底：页面自带的 _ROUTER_DATA（play_addr.url_list）里就是直链，视频没自动播放也能拿到
+    const router = (st && st.routerPlay) || [];
+    const pick = (re) => router.filter((u) => re.test(u)).pop() || "";
+    const rAudio = pick(/media-audio/i);
+    if (rAudio) return rAudio;
+    const rVideo = pick(/media-video|\.mp4(\?|$)|\.m4s(\?|$)/i);
+    if (rVideo) return rVideo;
+    const rAny = router.length ? router[router.length - 1] : "";
+    if (rAny) return rAny;
     const src = (st && st.src) || "";
     return /^https?:/i.test(src) ? src : "";
   }
@@ -5152,7 +5814,7 @@ class VideoNoteStudio extends Plugin {
     }
     const fs = require("fs");
     const nodePath = require("path");
-    const script = this.bridgePath;
+    const script = this.ensureBridgeFile() || this.bridgePath;
     const hasFile = !!(script && fs.existsSync(script));
     const embeddedSource = Buffer.from(ASR_BRIDGE_B64, "base64").toString("utf8");
     const workDir = hasFile ? nodePath.dirname(script) : require("os").tmpdir();

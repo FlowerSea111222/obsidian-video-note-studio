@@ -427,3 +427,11 @@
   color: #fff;
 }
 .vns-zoom-btn:hover { background: rgba(255, 255, 255, .24); }
+
+/* ---------- 抖音收藏同步面板 ---------- */
+.vns-fav-wrap { display: flex; flex-direction: column; gap: 8px; height: 72vh; }
+.vns-fav-status { font-weight: 600; }
+.vns-fav-hint { font-size: 12px; opacity: 0.7; }
+.vns-fav-frame { flex: 1; min-height: 200px; border: 1px solid var(--background-modifier-border); border-radius: 8px; overflow: hidden; }
+.vns-fav-actions { display: flex; gap: 8px; }
+.vns-fav-log { max-height: 130px; overflow: auto; font-size: 12px; line-height: 1.6; opacity: 0.85; }

@@ -93,3 +93,91 @@ git switch -c dev
    **不校验 `ffmpeg` / `yt-dlp`**，所以 PATH 缺 ffmpeg 时测试通过但真正转录会失败。
 3. `asr_bridge.py` 里 `ffmpeg` 是裸命令名，没有配置项；PATH 变化必须重启 Obsidian，
    建议加一个 `--ffmpeg` 参数并在设置里暴露。
+
+## 8. 自研功能：抖音收藏 → Obsidian 笔记
+
+> 目标：把抖音「我的收藏」批量同步成结构化笔记（文案 + 封面 + 配图 + AI 要点 + 可选视频/转录），
+> 参考实现了 yumingtao/douyin-favorites-sync、jinmm1233/douyin-knowledge-vault、
+> lyxdream/obsidian-douyin-capture（前两个依赖本地 Python 后端，本插件不引入后端，全部在 Electron webview 里完成）。
+
+### 8.1 原理（绕开签名服务的做法）
+
+抖音的收藏接口需要签名，但**抖音自己的页面里就带着签名能力**：
+
+```js
+const fn = window.use('webSignUrl');            // 抖音内部签名入口
+const { url } = await fn(unsignedUrl);          // 返回带 timestamp + x-secsdk-web-signature 的 url
+await fetch(url, { method: 'POST', credentials: 'include', ... });
+```
+
+所以插件只需要一个加载了 `https://www.douyin.com/user/self?showTab=favorite_collection` 的
+`<webview>`（分区 `persist:vns-douyin`，登录态持久化），然后在页内 `executeJavaScript`：
+
+1. 从 `localStorage.SysInfo.webid`（或 `__tea_cache_tokens_*` 的 `user_unique_id`）取 `webid`；
+2. 从 `document.cookie` 取 `UIFID`；
+3. 组装 `COLLECTION_BASE_PARAMS`（`device_platform=webapp&aid=6383&...`）+ `webid` + `uifid`；
+4. `window.use('webSignUrl')` 出签；
+5. `POST https://www.douyin.com/aweme/v1/web/aweme/listcollection?<query>`，
+   body `count=20&cursor=<上一页 cursor>`，header 带 `x-secsdk-csrf-token: DOWNGRADE`；
+6. 响应 `aweme_list[]`（每条含 desc / author / create_time / video.play_addr / images / statistics），`has_more`、`cursor` 翻页。
+
+**踩坑记录**：
+
+| 现象 | 原因 / 结论 |
+| --- | --- |
+| `listcollection/` **带尾斜杠 → 404 `Not Found`** | 端点必须写 `.../aweme/v1/web/aweme/listcollection`（无尾斜杠） |
+| `/aweme/v1/web/favorite/collect/list/` → `Unsupported path(Janus)` | 不是收藏接口，别用 |
+| 出签结果里没有 `a_bogus`，只有 `timestamp` + `x-secsdk-web-signature` | 新版 secsdk 签名，照样 200，不用强求 a_bogus |
+| 站外 curl / requestUrl 直连接口 | 403 `Blocked by ArgusSecurityPlugin Uifid Not Found`，**必须**在页面上下文里请求 |
+| 页面上 `performance.getEntriesByType('resource')` 能直接看到页面自己的签名 URL | 调试时用它对照参数（页面 UA 是 `browser_name=Electron`） |
+| 一页 20 条约 900 KB JSON | 在页内先把条目裁成精简结构再返回，避免每次回传整包 |
+
+### 8.2 代码位置（main.js）
+
+| 方法 / 类 | 作用 |
+| --- | --- |
+| `fetchDouyinFavPage(wv, cursor, count)` | 页内出签 + 拉一页收藏，返回精简 items |
+| `waitFavSigner(wv, timeout)` | 轮询等 `window.use('webSignUrl')` 就绪（首次可能要登录） |
+| `importFavItem(item, mode, opts)` | 单条 → 一篇笔记（下载封面/配图/视频 + 可选转录 + 可选 AI 要点） |
+| `buildFavNote(item, extra)` | 笔记模板（frontmatter `douyin_id` 用于去重） |
+| `ensureFavBinary(url, relPath, referer)` | 下载二进制进 vault（封面/视频），已存在跳过 |
+| `loadFavIndex()/saveFavIndex()` | `.vns/douyin-favorites.json`：`{ aweme_id: notePath }` 去重索引 |
+| `DouyinFavSyncModal` | 同步面板：内嵌抖音页（可登录）+ 进度 + 日志 + 停止 |
+| 命令 / ribbon | `抖音：同步收藏到笔记`、ribbon `bookmark` |
+| 调试协议 | `obsidian://vns?cmd=fav`（接口诊断）、`obsidian://vns?cmd=favsync&l=3&mode=heavy`（同步 N 条，可指定模式） |
+
+### 8.3 笔记结构
+
+```markdown
+---
+type: douyin
+content_type: video|image
+douyin_id: "7712843892600753458"
+author: "渣渣辉！"
+source: https://www.douyin.com/video/7712843892600753458
+create_time: "2026-11-27 13:33"
+favorite: true
+synced: 2026-11-28
+tags: [douyin, douyin-favorite, <文案里的 #话题>]
+---
+# 标题（文案第一句）
+![[抖音收藏/附件/<id>/video.mp4]]      ← heavy 模式；light 模式放封面
+> [!note] 抖音收藏 ｜ 作者 ｜ 发布时间 ｜ 时长 ｜ 👍💬⭐
+## 文案
+## 要点     ← AI 摘要（magpie / API）
+## 配图     ← 图文笔记
+## 时间戳   ← heavy 模式，Obsidian 内点击跳转播放器
+```
+
+### 8.4 设置项
+
+收藏笔记目录（默认 `抖音收藏`）、附件目录（默认 `抖音收藏/附件`）、
+同步模式（light/heavy）、每次条数（默认 20）、翻页间隔（6-12 秒随机，防风控）、
+启动时自动同步（默认关，距上次 >12h 才触发）。
+
+### 8.5 已知限制
+
+- 收藏列表按「最近收藏」倒序，已同步的靠 `douyin_id` 跳过；如果一次翻页太多会被风控，插件会等 30 秒重试 2 次。
+- heavy 模式的视频直链有时效，**必须在同一次同步里**下载/转录，隔太久会 403。
+- 图文作品的图片按 `01.jpg`、`02.jpg`… 落盘，视频作品只有 `cover.jpg` + `video.mp4`。
+- 没登录时接口返回空列表，面板会提示去窗口里登录。
