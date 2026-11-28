@@ -4749,6 +4749,7 @@ class VideoNoteStudio extends Plugin {
   }
 
   async handleVnsProtocol(params) {
+    if (params && params.cmd === "selftest") { await this.runSelfTest(); return; }
     if (params && params.cmd === "favsync") { this.openFavSync({ limit: parseInt(params.l || "0", 10) || undefined, mode: params.mode || undefined }); return; }
     if (params && params.cmd === "fav") { await this.runDouyinFavDiag(params); return; }
     if (params && params.cmd === "diag") { await this.runDouyinDiag(); return; }
@@ -4937,6 +4938,30 @@ class VideoNoteStudio extends Plugin {
     };
     setTimeout(() => { dump(); }, 9000);
     setTimeout(() => { try { modal.close(); } catch (e) { /* ignore */ } }, 40000);
+  }
+
+  /** 自检：伪渲染设置页 + 检查关键方法存在，结果写临时文件 */
+  async runSelfTest() {
+    const out = { at: new Date().toISOString(), codeVersion: "selftest-r1" };
+    try {
+      const tab = new VnsSettingTab(this.app, this);
+      const el = document.createElement("div");
+      tab.containerEl = el;
+      tab.display();
+      out.settingsNodes = el.childElementCount;
+      out.settingsHtmlLen = el.innerHTML.length;
+    } catch (e) { out.settingsError = String((e && e.message) || e); out.settingsStack = String(e && e.stack || "").slice(0, 600); }
+    try {
+      const idx = await this.loadFavIndex();
+      out.favIndexCount = Object.keys(idx).length;
+      out.hasFetchFav = typeof this.fetchDouyinFavPage === "function";
+      out.hasImportFav = typeof this.importFavItem === "function";
+      out.hasModal = typeof DouyinFavSyncModal === "function";
+    } catch (e) { out.favError = String((e && e.message) || e); }
+    try {
+      const fsx = require("fs");
+      fsx.writeFileSync(require("path").join(require("os").tmpdir(), "vns-selftest.json"), JSON.stringify(out, null, 2));
+    } catch (e) { /* ignore */ }
   }
 
   /* ---------- 抖音收藏同步 ---------- */

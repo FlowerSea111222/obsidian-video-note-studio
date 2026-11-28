@@ -181,3 +181,9 @@ tags: [douyin, douyin-favorite, <文案里的 #话题>]
 - heavy 模式的视频直链有时效，**必须在同一次同步里**下载/转录，隔太久会 403。
 - 图文作品的图片按 `01.jpg`、`02.jpg`… 落盘，视频作品只有 `cover.jpg` + `video.mp4`。
 - 没登录时接口返回空列表，面板会提示去窗口里登录。
+
+### 8.6 自检与回归
+
+`obsidian://vns?cmd=selftest` 会伪渲染设置页（`new VnsSettingTab(...).display()` 到游离 div），
+并把节点数 / 关键方法存在性 / 索引条数写到 `%TEMP%\vns-selftest.json`，
+用于改完代码后确认「设置页没炸、收藏方法和面板都在」。实测：`settingsNodes: 50`、`favIndexCount: 6`。
