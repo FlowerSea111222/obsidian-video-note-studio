@@ -435,3 +435,44 @@
 .vns-fav-frame { flex: 1; min-height: 200px; border: 1px solid var(--background-modifier-border); border-radius: 8px; overflow: hidden; }
 .vns-fav-actions { display: flex; gap: 8px; }
 .vns-fav-log { max-height: 130px; overflow: auto; font-size: 12px; line-height: 1.6; opacity: 0.85; }
+
+/* ---------- 抖音收藏：选片卡片墙 ---------- */
+.vns-fav-view { padding: 12px 16px 24px; overflow-y: auto; }
+.vns-fav-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.vns-fav-head-title { display: flex; align-items: baseline; gap: 8px; }
+.vns-fav-head-title h3 { margin: 0; }
+.vns-fav-count { font-size: 12px; opacity: 0.6; }
+.vns-fav-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.vns-fav-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; }
+.vns-fav-search { flex: 1 1 220px; min-width: 160px; }
+.vns-fav-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.vns-fav-chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--background-modifier-border); background: transparent; cursor: pointer; color: var(--text-muted); }
+.vns-fav-chip.is-active { background: var(--interactive-accent); border-color: var(--interactive-accent); color: var(--text-on-accent); }
+.vns-fav-status-line { font-size: 12px; opacity: 0.75; margin-bottom: 10px; min-height: 16px; }
+.vns-fav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.vns-fav-card { display: flex; flex-direction: column; border: 1px solid var(--background-modifier-border); border-radius: 10px; overflow: hidden; background: var(--background-secondary); }
+.vns-fav-card.is-selected { border-color: var(--interactive-accent); box-shadow: 0 0 0 2px var(--interactive-accent-hover); }
+.vns-fav-card.is-done { opacity: 0.92; }
+.vns-fav-thumb { position: relative; aspect-ratio: 9 / 13; background: var(--background-modifier-border); overflow: hidden; }
+.vns-fav-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vns-fav-thumb.is-broken::after { content: "🎬"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 28px; opacity: 0.5; }
+.vns-fav-dur, .vns-fav-tagtype, .vns-fav-donetag { position: absolute; font-size: 11px; line-height: 1; padding: 3px 6px; border-radius: 6px; background: rgba(0, 0, 0, 0.62); color: #fff; }
+.vns-fav-dur { right: 6px; bottom: 6px; }
+.vns-fav-tagtype { left: 6px; bottom: 6px; }
+.vns-fav-donetag { left: 6px; top: 6px; background: rgba(16, 122, 87, 0.9); }
+.vns-fav-body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.vns-fav-check { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; margin: 0; z-index: 3; cursor: pointer; }
+.vns-fav-title { font-size: 13px; font-weight: 600; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.vns-fav-card.is-selected .vns-fav-title { color: var(--interactive-accent); }
+.vns-fav-meta-line { display: flex; gap: 8px; font-size: 11px; opacity: 0.7; flex-wrap: wrap; }
+.vns-fav-card-actions { display: flex; gap: 6px; margin-top: 2px; }
+.vns-fav-card-actions button { font-size: 12px; padding: 2px 8px; }
+.vns-fav-foot { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.vns-fav-selinfo { font-size: 12px; opacity: 0.7; }
+.vns-fav-empty { grid-column: 1 / -1; padding: 30px 0; text-align: center; opacity: 0.6; font-size: 13px; }
+.vns-fav-wvbox { position: absolute; left: 0; top: 0; width: 2px; height: 2px; opacity: 0.01; overflow: hidden; pointer-events: none; }
+.vns-fav-modal { width: min(1180px, 94vw); }
+.vns-fav-modal .modal-content { overflow-y: auto; max-height: 76vh; }
+.vns-fav-wvbox { border-radius: 6px; }
+.vns-fav-hint { font-size: 11px; opacity: 0.55; margin-left: auto; }
+.vns-fav-check { filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8)); width: 18px; height: 18px; }

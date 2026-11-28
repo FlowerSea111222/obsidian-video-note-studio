@@ -3751,6 +3751,335 @@ class DouyinFavSyncModal extends Modal {
   }
 }
 
+/* ============================ 抖音收藏浏览（卡片墙选片） ============================ */
+
+class DouyinFavGalleryModal extends Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+    this.items = [];
+    this.byId = new Map();
+    this.selected = new Set();
+    this.cursor = 0;
+    this.hasMore = true;
+    this.loading = false;
+    this.busy = false;
+    this.index = {};
+    this.query = "";
+    this.filter = "all";
+    this.sort = "default";
+    this.mode = plugin.settings.favMode === "heavy" ? "heavy" : "light";
+    this.wv = null;
+    this.ready = false;
+    this.total = 0;
+  }
+
+  async onOpen() {
+    try { this.modalEl.addClass("vns-fav-modal"); } catch (e) { /* ignore */ }
+    try { this.titleEl.setText("抖音收藏 · 选片生成笔记"); } catch (e) { /* ignore */ }
+    try { this.index = await this.plugin.loadFavIndex(); } catch (e) { this.index = {}; }
+    this.render();
+    this.connect().catch((e) => this.setStatus(`初始化失败：${e.message}`));
+  }
+
+  onClose() {
+    try { if (this.wv) this.wv.remove(); } catch (e) { /* ignore */ }
+    this.wv = null;
+    this.contentEl.empty();
+  }
+
+  /* ---------- 骨架 ---------- */
+  render() {
+    const c = this.contentEl;
+    c.empty();
+    c.addClass("vns-fav-view");
+
+    const head = c.createDiv({ cls: "vns-fav-head" });
+    const t = head.createDiv({ cls: "vns-fav-head-title" });
+    t.createEl("h3", { text: "抖音收藏" });
+    this.countEl = t.createSpan({ cls: "vns-fav-count", text: "0 条" });
+
+    const tools = head.createDiv({ cls: "vns-fav-tools" });
+    this.modeSel = tools.createEl("select", { cls: "dropdown" });
+    for (const opt of [["light", "轻量：文案 + 封面"], ["heavy", "重量：下载视频 + 转录"]]) {
+      this.modeSel.createEl("option", { value: opt[0], text: opt[1] });
+    }
+    this.modeSel.value = this.mode;
+    this.modeSel.onchange = () => {
+      this.mode = this.modeSel.value;
+      if (this.hintEl) this.hintEl.setText(this.mode === "heavy" ? "重量模式：每条要下载视频并本地转录，约 1-3 分钟" : "轻量模式：只存文案 + 封面，几秒一条");
+      this.renderGrid();
+    };
+
+    const connectBtn = tools.createEl("button", { text: "连接抖音 / 登录" });
+    connectBtn.onclick = () => this.plugin.openFavSync();
+
+    const refreshBtn = tools.createEl("button", { text: "刷新列表" });
+    refreshBtn.onclick = () => {
+      this.items = [];
+      this.byId.clear();
+      this.cursor = 0;
+      this.hasMore = true;
+      this.selected.clear();
+      this.renderGrid();
+      this.loadPage();
+    };
+
+    this.genBtn = tools.createEl("button", { cls: "mod-cta", text: "生成笔记" });
+    this.genBtn.onclick = () => this.generateSelected();
+
+    /* 搜索 + 筛选 */
+    const bar = c.createDiv({ cls: "vns-fav-bar" });
+    this.searchEl = bar.createEl("input", { cls: "vns-fav-search", type: "search", placeholder: "搜索文案 / 作者…" });
+    this.searchEl.oninput = () => { this.query = this.searchEl.value.trim().toLowerCase(); this.renderGrid(); };
+    this.chipsEl = bar.createDiv({ cls: "vns-fav-chips" });
+    for (const f of [["all", "全部"], ["new", "未生成"], ["video", "视频"], ["image", "图文"], ["done", "已生成"]]) {
+      const chip = this.chipsEl.createEl("button", { cls: "vns-fav-chip", text: f[1] });
+      chip.dataset.filter = f[0];
+      chip.onclick = () => { this.filter = f[0]; this.renderGrid(); };
+    }
+    this.sortSel = bar.createEl("select", { cls: "dropdown vns-fav-sort" });
+    for (const s of [["default", "按收藏顺序"], ["digg", "点赞最多"], ["dur", "时长最长"]]) {
+      this.sortSel.createEl("option", { value: s[0], text: s[1] });
+    }
+    this.sortSel.onchange = () => { this.sort = this.sortSel.value; this.renderGrid(); };
+
+    this.statusEl = c.createDiv({ cls: "vns-fav-status-line", text: "正在连接抖音…" });
+
+    this.gridEl = c.createDiv({ cls: "vns-fav-grid" });
+
+    const foot = c.createDiv({ cls: "vns-fav-foot" });
+    this.moreBtn = foot.createEl("button", { text: "加载更多" });
+    this.moreBtn.onclick = () => this.loadPage();
+    this.selInfoEl = foot.createSpan({ cls: "vns-fav-selinfo", text: "" });
+    this.hintEl = foot.createSpan({ cls: "vns-fav-hint", text: this.mode === "heavy" ? "重量模式：每条要下载视频并本地转录，约 1-3 分钟" : "轻量模式：只存文案 + 封面，几秒一条" });
+    const selAll = foot.createEl("button", { text: "全选当前" });
+    selAll.onclick = () => this.toggleSelectVisible(true);
+    const selNone = foot.createEl("button", { text: "清空选择" });
+    selNone.onclick = () => { this.selected.clear(); this.renderGrid(); };
+
+    /* 隐藏的抖音页（仅用于出签取数，不可见） */
+    this.wvBox = c.createDiv({ cls: "vns-fav-wvbox" });
+  }
+
+  setStatus(text) { if (this.statusEl) this.statusEl.setText(text); }
+
+  /* ---------- 连接与分页 ---------- */
+  async connect() {
+    if (!this.wvBox) return;
+    if (!this.wv) {
+      this.wv = document.createElement("webview");
+      this.wv.setAttribute("partition", DOUYIN_PARTITION);
+      this.wv.setAttribute("src", "https://www.douyin.com/user/self?showTab=favorite_collection");
+      this.wv.setAttribute("webpreferences", "backgroundThrottling=false");
+      this.wv.style.width = "100%";
+      this.wv.style.height = "100%";
+      this.wvBox.appendChild(this.wv);
+    }
+    this.setStatus("正在连接抖音（首次需要登录，点上方「连接抖音 / 登录」）…");
+    const ok = await this.plugin.waitFavSigner(this.wv, 45000);
+    if (!ok) {
+      this.setStatus("没连上：请在「连接抖音 / 登录」的窗口里扫码登录，然后回来点「刷新列表」");
+      return;
+    }
+    this.ready = true;
+    if (!this.items.length) await this.loadPage();
+  }
+
+  async loadPage() {
+    if (!this.ready || this.loading || !this.hasMore) return;
+    this.loading = true;
+    this.moreBtn.setText("正在加载…");
+    this.moreBtn.disabled = true;
+    try {
+      const res = await this.plugin.fetchDouyinFavPage(this.wv, this.cursor, 20);
+      if (!res || !res.ok) {
+        const msg = (res && (res.err || res.status)) || "未知错误";
+        if (res && res.blocked) this.setStatus("抖音风控拦了一次，等 20 秒自动重试…");
+        else this.setStatus(`读取失败：${msg}（可点「连接抖音 / 登录」重新登录后刷新）`);
+        if (res && res.blocked) {
+          await new Promise((r) => setTimeout(r, 20000));
+          this.loading = false;
+          this.moreBtn.setText("加载更多");
+          this.moreBtn.disabled = false;
+          return this.loadPage();
+        }
+        return;
+      }
+      if (res.total) this.total = res.total;
+      const fresh = (res.items || []).filter((it) => it.id && !this.byId.has(it.id));
+      for (const it of fresh) {
+        this.byId.set(it.id, it);
+        this.items.push(it);
+      }
+      this.cursor = Number(res.cursor) || 0;
+      this.hasMore = !!res.hasMore;
+      this.setStatus(`已载入 ${this.items.length} 条${this.total ? ` / 共 ${this.total} 条` : ""}｜勾选后点「生成笔记」`);
+      this.renderGrid();
+    } finally {
+      this.loading = false;
+      if (this.moreBtn) {
+        this.moreBtn.setText(this.hasMore ? "加载更多" : "没有更多了");
+        this.moreBtn.disabled = !this.hasMore;
+      }
+    }
+  }
+
+  /* ---------- 列表渲染 ---------- */
+  coverFor(item) {
+    const attach = this.plugin.settings.favAttachFolder || "抖音收藏/附件";
+    const p = `${attach}/${item.id}/cover.jpg`;
+    try {
+      if (this.app.vault.getAbstractFileByPath(p)) return this.app.vault.adapter.getResourcePath(p);
+    } catch (e) { /* ignore */ }
+    return item.cover || (item.imgs && item.imgs[0]) || "";
+  }
+
+  visibleItems() {
+    let list = this.items.slice();
+    if (this.query) {
+      list = list.filter((it) => `${it.desc || ""} ${it.author || ""}`.toLowerCase().includes(this.query));
+    }
+    if (this.filter === "new") list = list.filter((it) => !this.index[it.id]);
+    if (this.filter === "done") list = list.filter((it) => !!this.index[it.id]);
+    if (this.filter === "video") list = list.filter((it) => it.type !== "image");
+    if (this.filter === "image") list = list.filter((it) => it.type === "image");
+    if (this.sort === "digg") list.sort((a, b) => (b.digg || 0) - (a.digg || 0));
+    if (this.sort === "dur") list.sort((a, b) => (b.dur || 0) - (a.dur || 0));
+    return list;
+  }
+
+  renderGrid() {
+    if (!this.gridEl) return;
+    const list = this.visibleItems();
+    this.gridEl.empty();
+    if (!list.length) {
+      this.gridEl.createDiv({ cls: "vns-fav-empty", text: this.items.length ? "没有符合筛选条件的收藏" : "还没有载入收藏，稍等或点「刷新列表」" });
+    }
+    for (const item of list) {
+      const done = this.index[item.id];
+      const card = this.gridEl.createDiv({ cls: "vns-fav-card" });
+      if (this.selected.has(item.id)) card.addClass("is-selected");
+      if (done) card.addClass("is-done");
+
+      const thumb = card.createDiv({ cls: "vns-fav-thumb" });
+      const check = thumb.createEl("input", { cls: "vns-fav-check", type: "checkbox" });
+      check.checked = this.selected.has(item.id);
+      check.onchange = () => {
+        if (check.checked) this.selected.add(item.id); else this.selected.delete(item.id);
+        card.toggleClass("is-selected", check.checked);
+        this.updateSelInfo();
+      };
+      check.onclick = (ev) => ev.stopPropagation();
+      thumb.onclick = () => { check.checked = !check.checked; check.onchange(); };
+      const src = this.coverFor(item);
+      if (src) {
+        const img = thumb.createEl("img", { attr: { loading: "lazy", src: src, alt: "" } });
+        img.onerror = () => { img.remove(); thumb.addClass("is-broken"); };
+      } else {
+        thumb.addClass("is-broken");
+      }
+      if (item.dur) thumb.createSpan({ cls: "vns-fav-dur", text: fmtTime(item.dur) });
+      if (item.type === "image") thumb.createSpan({ cls: "vns-fav-tagtype", text: "图文" });
+      if (done) thumb.createSpan({ cls: "vns-fav-donetag", text: "已生成" });
+
+      const body = card.createDiv({ cls: "vns-fav-body" });
+      const titleEl = body.createDiv({ cls: "vns-fav-title", text: this.plugin.favTitle(item) || item.id });
+      titleEl.onclick = () => { check.checked = !check.checked; check.onchange(); };
+      const meta = body.createDiv({ cls: "vns-fav-meta-line" });
+      meta.createSpan({ text: `@${item.author || "抖音"}` });
+      if (item.digg) meta.createSpan({ text: `👍 ${this.plugin.favNum(item.digg)}` });
+      if (item.comment) meta.createSpan({ text: `💬 ${this.plugin.favNum(item.comment)}` });
+
+      const acts = body.createDiv({ cls: "vns-fav-card-actions" });
+      const one = acts.createEl("button", { text: done ? "重新生成" : "生成" });
+      one.onclick = () => this.generateOne(item, one);
+      const openLink = acts.createEl("button", { text: "打开" });
+      openLink.onclick = () => this.plugin.playVideoUrl(`https://www.douyin.com/video/${item.id}`);
+    }
+    const doneCount = this.items.filter((it) => !!this.index[it.id]).length;
+    this.countEl.setText(`${this.items.length} 条 · 已生成 ${doneCount}`);
+    for (const chip of Array.from(this.chipsEl.children)) {
+      chip.toggleClass("is-active", chip.dataset.filter === this.filter);
+    }
+    this.updateSelInfo();
+  }
+
+  updateSelInfo() {
+    const n = this.selected.size;
+    this.selInfoEl.setText(n ? `已选 ${n} 条` : "未选择");
+    this.genBtn.setText(n ? `生成选中（${n}）` : "生成笔记");
+    this.genBtn.disabled = this.busy || !n;
+  }
+
+  toggleSelectVisible(on) {
+    for (const item of this.visibleItems()) {
+      if (on) this.selected.add(item.id); else this.selected.delete(item.id);
+    }
+    this.renderGrid();
+  }
+
+  /* ---------- 生成 ---------- */
+  async generateOne(item, btn) {
+    if (this.busy) return;
+    this.busy = true;
+    const label = btn ? btn.getText() : "";
+    if (btn) { btn.setText("处理中…"); btn.disabled = true; }
+    try {
+      this.setStatus(`正在生成：${this.plugin.favTitle(item)}（${this.mode === "heavy" ? "下载视频 + 转录，可能要几分钟" : "轻量"}）`);
+      const path = await this.plugin.importFavItem(item, this.mode, {
+        summarize: this.plugin.settings.autoSummarize,
+        transcribe: this.mode === "heavy",
+      });
+      this.index[item.id] = path;
+      await this.plugin.saveFavIndex(this.index);
+      this.selected.delete(item.id);
+      this.setStatus(`✅ 已生成：${path}`);
+      new Notice(`已生成笔记：${path}`, 5000);
+    } catch (e) {
+      this.setStatus(`❌ 生成失败：${e.message}`);
+      new Notice(`生成失败：${e.message}`, 8000);
+    } finally {
+      this.busy = false;
+      if (btn) { btn.setText(label || "生成"); btn.disabled = false; }
+      this.renderGrid();
+    }
+  }
+
+  async generateSelected() {
+    if (this.busy) return;
+    const ids = Array.from(this.selected);
+    if (!ids.length) return;
+    this.busy = true;
+    this.genBtn.disabled = true;
+    let ok = 0;
+    let fail = 0;
+    for (let i = 0; i < ids.length; i += 1) {
+      const item = this.byId.get(ids[i]);
+      if (!item) continue;
+      this.setStatus(`批量生成 ${i + 1}/${ids.length}：${this.plugin.favTitle(item)}`);
+      try {
+        const path = await this.plugin.importFavItem(item, this.mode, {
+          summarize: this.plugin.settings.autoSummarize,
+          transcribe: this.mode === "heavy",
+        });
+        this.index[item.id] = path;
+        this.selected.delete(item.id);
+        await this.plugin.saveFavIndex(this.index);
+        ok += 1;
+      } catch (e) {
+        fail += 1;
+        console.debug("[vns] 批量生成失败", item.id, e.message);
+      }
+      this.renderGrid();
+    }
+    this.busy = false;
+    this.setStatus(`批量完成：成功 ${ok} 篇${fail ? `，失败 ${fail} 篇` : ""}`);
+    if (ok) new Notice(`抖音收藏：生成 ${ok} 篇笔记`, 6000);
+    this.renderGrid();
+  }
+}
+
 class VnsSettingTab extends PluginSettingTab {
   constructor(app, plugin) { super(app, plugin); this.plugin = plugin; }
 
@@ -4477,7 +4806,7 @@ class VideoNoteStudio extends Plugin {
       this.maybeAutoOpenPlayer(file).catch((e) => console.debug("[vns] 自动打开播放器失败", e));
     }));
     this.addRibbonIcon("play-circle", "打开视频播放器", () => this.openPlayer());    this.addSettingTab(new VnsSettingTab(this.app, this));
-    this.addRibbonIcon("bookmark", "同步抖音收藏到笔记", () => { this.recordHabit("sync-douyin-fav"); this.openFavSync(); });
+    this.addRibbonIcon("bookmark", "抖音收藏：选片生成笔记", () => { this.recordHabit("open-fav-gallery"); this.openFavGallery(); });
 
     const cmd = (id, name, fn) => this.addCommand({ id, name, callback: () => { this.recordHabit(id); Promise.resolve(fn()).catch((e) => this.fail(e)); } });
 
@@ -4495,7 +4824,8 @@ class VideoNoteStudio extends Plugin {
     cmd("distill-book", "拆书：书籍转章节笔记", () => this.distillBookPrompt());
     cmd("enrich-clippings", "补全 Clippings 里的视频剪藏", () => this.enrichClippings());
     cmd("write-habits", "生成使用习惯笔记", () => this.writeHabitNote());
-    cmd("sync-douyin-fav", "抖音：同步收藏到笔记", () => this.openFavSync());
+    cmd("open-fav-gallery", "抖音收藏：打开选片界面", () => this.openFavGallery());
+    cmd("sync-douyin-fav", "抖音：一键同步收藏（自动最近 N 条）", () => this.openFavSync());
     cmd("douyin-cookie", "抖音：打开页面抓取 Cookie", async () => {
       const r = await this.probeDouyinCookies();
       new Notice(r && r.cookie ? `抖音 Cookie 已更新（${this.douyinCookieInfo()}）` : "没抓到 Cookie，试试在窗口里登录一次", 8000);
@@ -4760,6 +5090,7 @@ class VideoNoteStudio extends Plugin {
   }
 
   async handleVnsProtocol(params) {
+    if (params && params.cmd === "gallery") { await this.openFavGallery(); return; }
     if (params && params.cmd === "probe") { await this.runProbe(params.u); return; }
     if (params && params.cmd === "selftest") { await this.runSelfTest(); return; }
     if (params && params.cmd === "favsync") { this.openFavSync({ limit: parseInt(params.l || "0", 10) || undefined, mode: params.mode || undefined }); return; }
@@ -5038,6 +5369,11 @@ class VideoNoteStudio extends Plugin {
   }
 
   openFavSync(opts) { new DouyinFavSyncModal(this.app, this, opts || {}).open(); }
+
+  /** 打开「抖音收藏」卡片墙：自己挑片生成笔记 */
+  async openFavGallery() {
+    new DouyinFavGalleryModal(this.app, this).open();
+  }
 
   /** 常驻定时同步：设置分钟数 > 0 时，按间隔自动跑（每分钟检查一次） */
   maybeTimerSync() {
