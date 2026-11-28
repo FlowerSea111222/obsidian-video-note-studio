@@ -50,6 +50,29 @@ def download_audio(url, ytdlp, tmp, cookie=""):
     return files[0]
 
 
+# 抖音这类平台没有平台字幕、也不给 yt-dlp 抓（要新鲜 Cookie），
+# 播放器里能直接拿到 CDN 直链，这里就用 urllib 直下，绕开 yt-dlp。
+DIRECT_MEDIA_RE = re.compile(r"\.(mp4|m4a|mp3|webm|aac|m4s)(\?|$)", re.I)
+
+
+def download_direct(url, tmp, referer="https://www.douyin.com/"):
+    import urllib.request
+
+    out = tmp / "audio.mp4"
+    req = urllib.request.Request(url, headers={
+        "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                       "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"),
+        "Referer": referer or "https://www.douyin.com/",
+        "Accept": "*/*",
+    })
+    log(f"$ GET {url[:120]}…")
+    with urllib.request.urlopen(req, timeout=180) as resp, open(out, "wb") as f:
+        shutil.copyfileobj(resp, f)
+    if out.stat().st_size < 10 * 1024:
+        raise RuntimeError("直链下载的文件太小，可能是防盗链或已过期")
+    return out
+
+
 def load_audio(path, sr=16000):
     import numpy as np
     p = run_bytes(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
@@ -108,12 +131,23 @@ def main():
     ap.add_argument("--language", default="")
     ap.add_argument("--ytdlp", default="yt-dlp")
     ap.add_argument("--cookie", default="")
+    ap.add_argument("--media-url", default="", help="播放器抓到的 CDN 直链（优先于 yt-dlp）")
+    ap.add_argument("--referer", default="")
     ap.add_argument("--timeout", type=int, default=1800)
     args = ap.parse_args()
 
     tmp = tempfile.mkdtemp(prefix="vns-asr-")
     try:
-        audio = download_audio(args.url, args.ytdlp, __import__("pathlib").Path(tmp), args.cookie)
+        tmp_path = __import__("pathlib").Path(tmp)
+        if args.media_url and (DIRECT_MEDIA_RE.search(args.media_url) or "douyinvod" in args.media_url
+                               or "bytecdn" in args.media_url):
+            try:
+                audio = download_direct(args.media_url, tmp_path, args.referer)
+            except Exception as exc:
+                log(f"[asr] 直链下载失败，回退 yt-dlp：{exc}")
+                audio = download_audio(args.url, args.ytdlp, tmp_path, args.cookie)
+        else:
+            audio = download_audio(args.url, args.ytdlp, tmp_path, args.cookie)
         log(f"[asr] 音频就绪 {audio.stat().st_size // 1024} KB")
         samples = load_audio(audio)
         log(f"[asr] 采样点 {len(samples)}")

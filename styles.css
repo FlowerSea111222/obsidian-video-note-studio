@@ -383,3 +383,47 @@
   .vns-actionbar { padding: 6px 12px; }
   .vns-toolbar { padding: 10px 12px; }
 }
+
+/* ===== 抖音 webview ===== */
+.vns-stage webview {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border: 0; background: #000;
+}
+.vns-webview-hint {
+  position: absolute; left: 8px; bottom: 8px; z-index: 5;
+  max-width: 76%; padding: 4px 9px; border-radius: 6px;
+  background: rgba(0, 0, 0, .58); color: #eaeaea;
+  font-size: 11px; line-height: 1.4; pointer-events: none;
+}
+.vns-douyin-modal { width: min(980px, 92vw); }
+.vns-douyin-frame {
+  margin-top: 10px; width: 100%; height: 72vh;
+  background: #000; border-radius: 8px; overflow: hidden;
+}
+.vns-douyin-frame webview { width: 100%; height: 100%; border: 0; }
+
+/* ===== webview 播放区：抖音页面很高，裁 16:9 会看不全 ===== */
+.vns-stage.is-webview {
+  aspect-ratio: auto;
+  height: clamp(420px, 72vh, 980px);
+  background: #0d0d0f;
+}
+.vns-stage.is-webview webview { background: #0d0d0f; }
+.vns-webview-zoom {
+  position: absolute; right: 8px; top: 8px; z-index: 7;
+  display: flex; gap: 4px;
+  padding: 3px; border-radius: 8px;
+  background: rgba(0, 0, 0, .5);
+  backdrop-filter: blur(4px);
+}
+.vns-zoom-btn {
+  min-width: 28px; height: 24px; padding: 0 7px;
+  border: 0; border-radius: 6px; cursor: pointer;
+  background: rgba(255, 255, 255, .12); color: #f2f2f2;
+  font-size: 12px; line-height: 1;
+}
+.vns-zoom-btn.is-active {
+  background: rgba(64, 158, 255, .45);
+  color: #fff;
+}
+.vns-zoom-btn:hover { background: rgba(255, 255, 255, .24); }

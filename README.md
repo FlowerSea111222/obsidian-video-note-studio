@@ -22,6 +22,9 @@
 | 12 | B站扫码登录 | 播放器或设置里点「B站登录」，手机扫码确认；登录后播放器使用账号可用清晰度（大会员画质仍需对应账号） |
 | 13 | magpie 路由 | 设置里开「使用 magpie 路由」，直连本机 magpie 网关，无需 API Key；模型可下拉选择 |
 | 14 | 简繁体统一 | 转录/摘要/翻译/拆书统一输出简体中文（Whisper 经 OpenCC 转换） |
+| 15 | 抖音内嵌播放 | 抖音用 Electron `webview` 打开官方播放页（iframe 会被反嵌拦死），可从页面里打时间戳、跳转进度；顺手抓 Cookie 与播放直链 |
+| 17 | 网页视频内嵌播放 | 普通网页 / 公众号 / 网盘链接用 webview 打开（iframe 常被 X-Frame-Options 挡），页面里有 <video> 就能打时间戳、抓媒体直链 |
+| 16 | 分享短链解析 | `v.douyin.com/xxx`、`b23.tv/xxx` 自动展开成短视频/视频页链接，播放与生成笔记都认；直接贴**整段分享文案**也行（自动从乱码/话题标签/尾注里抠出链接） |
 
 ## 安装（手动）
 
@@ -52,11 +55,22 @@ ffmpeg 仅 yt-dlp 的音频场景需要，本插件不直接调用。
 | 本地视频 / 直链 mp4 | 直接设置 `<video>.currentTime` 并播放 |
 | YouTube | 通过官方 iframe `postMessage` 发 `seekTo` |
 | B站 | 播放器不对外暴露 seek 接口，改为带 `&t=秒&autoplay=1` 重载 iframe（实测 `t` 参数生效） |
-| 抖音 / 网页 / 网盘 | 无时间轴，链接照旧指向原文 |
+| 抖音 | 在 `webview` 里执行 JS 设置 `video.currentTime`，进度按 1 秒轮询回读 |
+| 网页 / 网盘 | 无时间轴，链接照旧指向原文 |
 
 > 实测依据：`player.bilibili.com/player.html?...&autoplay=0&t=60` 加载后 `video.currentTime === 60`，说明 B站 播放器确实认 `t` 参数。
 
 
+
+## 抖音怎么用
+
+抖音把 `X-Frame-Options` + JS 反嵌一起上，`iframe` 和内嵌 API 全部报废（官方 `open.douyin.com/player` 只给 SDK 演示页），所以插件换成 **Electron `webview`**：它是独立 guest 进程，天然绕过这些限制。
+
+1. 粘贴 `v.douyin.com/…` 短链或 `douyin.com/video/<id>` → 播放器用 webview 打开官方播放页。
+2. 首次可能需要点一下页面里的播放键 / 登录（登录态存在 `persist:vns-douyin` 分区里，重启不丢）。
+3. 页面里的 `<video>` 一就绪，插件就抓到 **播放直链 + Cookie**：直链给 Whisper 转录用（不再受 yt-dlp「需要新鲜 Cookie」的折磨），Cookie 给 yt-dlp 取标题/时长/点赞。
+4. 点 `⏱ 打时间戳`、点笔记里的时间戳跳转，全部按 webview 里的真实进度走。
+5. 命令面板 `抖音：打开页面抓取 Cookie` 可以单独刷新 Cookie；设置页可关闭「抖音使用内嵌浏览器播放」。
 
 ## 本地转录（asr_bridge.py）
 
@@ -75,7 +89,7 @@ yt-dlp 下音频 → ffmpeg 解成 16 kHz PCM → faster-whisper 逐段识别 �
 
 - **B站 多数视频没有 CC/AI 字幕**，`yt-dlp` 只能列出弹幕流；插件会自动回退到本地 Whisper 转录，因此需要本机装好 Python + faster-whisper，没装时笔记里会写明卡在哪一步，不会给你一篇空壳。
 - **B站 iframe 不暴露播放进度**，时间戳按钮对 B站 使用的是内部计时器（近似值），可手动修正；YouTube 走官方 `postMessage` 取值，本地文件直接读 `<video>.currentTime`，都准确。
-- **抖音** 页面强依赖 JS，`requestUrl` 抓不到正文，通常只能拿到标题/封面；有 yt-dlp 时可尝试取字幕。
+- **抖音** 页面强依赖 JS，`requestUrl` 只拿得到分享页骨架；播放靠 `webview`，转录靠播放器抓到的 CDN 直链（直链有有效期，过期重新打开播放页即可）。yt-dlp 取元数据需要新鲜 Cookie，插件会自动从 webview 抓。
 - **网盘** 只做元数据与提取码识别（`提取码：xxxx`），不做下载。
 - **PDF 拆书** 未实现，请先转成 txt/md/epub。
 - 桌面端专用：`child_process` 与 `readBinary` 依赖 Electron。
@@ -100,3 +114,19 @@ node --check main.js
 ## License
 
 MIT
+
+## 抖音沉浸播放（默认开启）
+
+抖音播放页自带顶部导航、右侧评论、底部推荐，直接塞进播放器只看得到一小块。插件默认开「沉浸」，目标是**整个播放区只剩视频本体**：
+
+1. 沿 `<video>` 的祖先链清掉 `transform / filter` 等会让 `position: fixed` 失效的属性（否则视频浮不出容器，页面头尾照旧露着），并给链上每一级抬 `z-index`，保证视频真的浮到最上层；
+2. 把播放链之外的所有兄弟节点（页面头尾 / 评论区 / 播放器控制条）`visibility: hidden`；
+3. 再垫一层全屏黑幕兜底。
+
+- 播放器右上角：`− / + / 适配 / 比例 / 沉浸 / 全屏`
+- **比例**：默认开启，播放区缩放成视频的真实比例，画面 `contain` 完整显示——**一根像素都不裁**，上下黑边随之消失；再点恢复固定播放区（设置里也有「按视频比例适配」开关）
+- 沉浸时点画面 = 暂停 / 续播（页面自己的控制条已隐藏）
+- 退出沉浸 = 重载页面回到完整网页；设置里可关掉「抖音默认沉浸（只留视频）」
+- 抖音 SPA 会重渲染（切下个视频、评论区懒加载），注入的脚本每秒自动补妆，不会看两眼就打回原形
+- 缩放默认 0.8（普通网页 1.0），会记住上次的值
+- 播放区高度从固定 16:9 改成 `72vh`，竖屏/高页面也能看全

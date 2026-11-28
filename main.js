@@ -2314,10 +2314,15 @@ var qrcode = function() {
 })();
 
 /* EMBEDDED_ASR_BRIDGE_START */
-const ASR_BRIDGE_B64 = "IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQoiIiJhc3JfYnJpZGdlLnB5IOKAlCDnu5kgT2JzaWRpYW4g5o+S5Lu255So55qE5pys5Zyw6L2s5b2V5qGl44CCCgrnlKjms5XvvJoKICBweXRob24gYXNyX2JyaWRnZS5weSAtLXVybCA86KeG6aKR6ZO+5o6lPiBbLS1tb2RlbCBzbWFsbF0gWy0tbGFuZ3VhZ2UgemhdIFstLXl0ZGxwIHl0LWRscF0KCui+k+WHuu+8iHN0ZG91dCDmnIDlkI7kuIDooYzvvInvvJp7InNlZ21lbnRzIjogW1vnp5IsICLmlofmnKwiXSwgLi4uXSwgImxhbmd1YWdlIjogInpoIiwgImR1cmF0aW9uIjogMjk0LjN9CuaXpeW/l+S4gOW+i+i1sCBzdGRlcnLvvIzkuI3lvbHlk43mj5Lku7bop6PmnpDjgIIKIiIiCmltcG9ydCBhcmdwYXJzZQppbXBvcnQganNvbgppbXBvcnQgb3MKaW1wb3J0IHJlCmltcG9ydCBzaHV0aWwKaW1wb3J0IHN1YnByb2Nlc3MKaW1wb3J0IHN5cwppbXBvcnQgdGVtcGZpbGUKCm9zLmVudmlyb24uc2V0ZGVmYXVsdCgiSEZfRU5EUE9JTlQiLCAiaHR0cHM6Ly9oZi1taXJyb3IuY29tIikKb3MuZW52aXJvbi5zZXRkZWZhdWx0KCJIRl9IVUJfT0ZGTElORSIsICIwIikKCnRyeToKICAgIHN5cy5zdGRvdXQucmVjb25maWd1cmUoZW5jb2Rpbmc9InV0Zi04IikKICAgIHN5cy5zdGRlcnIucmVjb25maWd1cmUoZW5jb2Rpbmc9InV0Zi04IikKZXhjZXB0IEV4Y2VwdGlvbjoKICAgIHBhc3MKCgpkZWYgbG9nKG1zZyk6CiAgICBwcmludChtc2csIGZpbGU9c3lzLnN0ZGVyciwgZmx1c2g9VHJ1ZSkKCgpkZWYgcnVuX2J5dGVzKGNtZCwgdGltZW91dD0xODAwKToKICAgIGxvZygiJCAiICsgIiAiLmpvaW4oY21kKSkKICAgIHJldHVybiBzdWJwcm9jZXNzLnJ1bihjbWQsIGNhcHR1cmVfb3V0cHV0PVRydWUsIHRpbWVvdXQ9dGltZW91dCkKCgpkZWYgZG93bmxvYWRfYXVkaW8odXJsLCB5dGRscCwgdG1wLCBjb29raWU9IiIpOgogICAgb3V0ID0gc3RyKHRtcCAvICJhdWRpby4lKGV4dClzIikKICAgIGNtZCA9IFt5dGRscCwgIi1mIiwgImJlc3RhdWRpb1tleHQ9bTRhXS9iZXN0YXVkaW8vYmVzdCIsCiAgICAgICAgICAgIi0tbm8td2FybmluZ3MiLCAiLS1uby1wbGF5bGlzdCJdCiAgICBpZiBjb29raWU6CiAgICAgICAgY21kICs9IFsiLS1hZGQtaGVhZGVyIiwgZiJDb29raWU6IHtjb29raWV9Il0KICAgIGNtZCArPSBbIi1vIiwgb3V0LCB1cmxdCiAgICBwID0gcnVuX2J5dGVzKGNtZCkKICAgIGZpbGVzID0gW2YgZm9yIGYgaW4gdG1wLmdsb2IoImF1ZGlvLioiKSBpZiBmLmlzX2ZpbGUoKV0KICAgIGlmIG5vdCBmaWxlczoKICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoIumfs+mikeS4i+i9veWksei0pTogIiArIChwLnN0ZGVyciBvciBiIiIpLmRlY29kZSgidXRmLTgiLCAicmVwbGFjZSIpWy01MDA6XSkKICAgIHJldHVybiBmaWxlc1swXQoKCmRlZiBsb2FkX2F1ZGlvKHBhdGgsIHNyPTE2MDAwKToKICAgIGltcG9ydCBudW1weSBhcyBucAogICAgcCA9IHJ1bl9ieXRlcyhbImZmbXBlZyIsICItbm9zdGRpbiIsICItaGlkZV9iYW5uZXIiLCAiLWxvZ2xldmVsIiwgImVycm9yIiwKICAgICAgICAgICAgICAgICAgICItaSIsIHN0cihwYXRoKSwgIi1mIiwgInMxNmxlIiwgIi1hYyIsICIxIiwgIi1hciIsIHN0cihzciksICItIl0pCiAgICBpZiBwLnJldHVybmNvZGUgIT0gMCBvciBub3QgcC5zdGRvdXQ6CiAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJmZm1wZWcg6Kej56CB5aSx6LSlOiAiICsgKHAuc3RkZXJyIG9yIGIiIikuZGVjb2RlKCJ1dGYtOCIsICJyZXBsYWNlIilbLTQwMDpdKQogICAgcmV0dXJuIG5wLmZyb21idWZmZXIocC5zdGRvdXQsIGR0eXBlPW5wLmludDE2KS5hc3R5cGUoImZsb2F0MzIiKSAvIDMyNzY4LjAKCgp0cnk6CiAgICBmcm9tIG9wZW5jYyBpbXBvcnQgT3BlbkNDCiAgICBUMlMgPSBPcGVuQ0MoInQycyIpCmV4Y2VwdCBFeGNlcHRpb246CiAgICBUMlMgPSBOb25lCgoKZGVmIHNpbXBsaWZpZWQodGV4dCk6CiAgICAiIiJXaGlzcGVyIOWcqOS4reaWh+WPo+mfsy/kuK3oi7Hmt7for7Tml7blj6/og73lkJDlh7rnuYHkvZPvvIznu5/kuIDovaznroDkvZPjgIIiIiIKICAgIGlmIG5vdCB0ZXh0OgogICAgICAgIHJldHVybiB0ZXh0CiAgICByZXR1cm4gVDJTLmNvbnZlcnQodGV4dCkgaWYgVDJTIGVsc2UgdGV4dAoKCk5PSVNFX1JFID0gcmUuY29tcGlsZShyIl5bXHPimarwn461KlxbXCjvvIhdKihtdXNpY3zpn7PkuZB8YXBwbGF1c2V85o6M5aOwfOmdmemfs3xzaWxlbmNlKVtcc+KZqvCfjrUqXF1cKe+8iV0qJCIsIHJlLkkpCgoKZGVmIGRyb3Bfbm9pc2UoaXRlbXMpOgogICAgIiIid2hpc3BlciDlr7nnuq/pn7PkuZDop4bpopHkvJrlkJDlh7ogIk11c2ljIiDov5nnsbvmoIfnrb7vvIzkuI3og73lvZPovazlvZXnlKjjgIIiIiIKICAgIG91dCA9IFtdCiAgICBmb3Igc3RhcnQsIHRleHQgaW4gaXRlbXM6CiAgICAgICAgdCA9ICh0ZXh0IG9yICIiKS5zdHJpcCgpCiAgICAgICAgaWYgbm90IHQgb3IgTk9JU0VfUkUubWF0Y2godCk6CiAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgb3V0LmFwcGVuZChbc3RhcnQsIHRdKQogICAgcmV0dXJuIG91dAoKCmRlZiBtZXJnZShpdGVtcywgbWluX2NoYXJzPTI0LCBtYXhfZ2FwPTguMCwgbWF4X2NoYXJzPTE0MCk6CiAgICBvdXQgPSBbXQogICAgZm9yIHN0YXJ0LCB0ZXh0IGluIGl0ZW1zOgogICAgICAgIGlmIG91dDoKICAgICAgICAgICAgbHMsIGx0ID0gb3V0Wy0xXQogICAgICAgICAgICBlbmRlZCA9IGJvb2wocmUuc2VhcmNoKHIiW+OAgu+8n++8gT8hLu+8mztdJCIsIGx0KSkgYW5kIGxlbihsdCkgPj0gbWluX2NoYXJzCiAgICAgICAgICAgIGlmIChub3QgZW5kZWQgYW5kIGxlbihsdCkgPCBtYXhfY2hhcnMgYW5kIGxlbihsdCkgPCBtaW5fY2hhcnMgKiA0CiAgICAgICAgICAgICAgICAgICAgYW5kIHN0YXJ0IC0gbHMgPD0gbWF4X2dhcCBhbmQgbGVuKGx0KSArIGxlbih0ZXh0KSA8PSBtYXhfY2hhcnMpOgogICAgICAgICAgICAgICAgb3V0Wy0xXSA9IFtscywgKGx0ICsgIiAiICsgdGV4dCkuc3RyaXAoKV0KICAgICAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgb3V0LmFwcGVuZChbc3RhcnQsIHRleHRdKQogICAgcmV0dXJuIG91dAoKCmRlZiBtYWluKCk6CiAgICBhcCA9IGFyZ3BhcnNlLkFyZ3VtZW50UGFyc2VyKCkKICAgIGFwLmFkZF9hcmd1bWVudCgiLS11cmwiLCByZXF1aXJlZD1UcnVlKQogICAgYXAuYWRkX2FyZ3VtZW50KCItLW1vZGVsIiwgZGVmYXVsdD0ic21hbGwiKQogICAgYXAuYWRkX2FyZ3VtZW50KCItLWxhbmd1YWdlIiwgZGVmYXVsdD0iIikKICAgIGFwLmFkZF9hcmd1bWVudCgiLS15dGRscCIsIGRlZmF1bHQ9Inl0LWRscCIpCiAgICBhcC5hZGRfYXJndW1lbnQoIi0tY29va2llIiwgZGVmYXVsdD0iIikKICAgIGFwLmFkZF9hcmd1bWVudCgiLS10aW1lb3V0IiwgdHlwZT1pbnQsIGRlZmF1bHQ9MTgwMCkKICAgIGFyZ3MgPSBhcC5wYXJzZV9hcmdzKCkKCiAgICB0bXAgPSB0ZW1wZmlsZS5ta2R0ZW1wKHByZWZpeD0idm5zLWFzci0iKQogICAgdHJ5OgogICAgICAgIGF1ZGlvID0gZG93bmxvYWRfYXVkaW8oYXJncy51cmwsIGFyZ3MueXRkbHAsIF9faW1wb3J0X18oInBhdGhsaWIiKS5QYXRoKHRtcCksIGFyZ3MuY29va2llKQogICAgICAgIGxvZyhmIlthc3JdIOmfs+mikeWwsee7qiB7YXVkaW8uc3RhdCgpLnN0X3NpemUgLy8gMTAyNH0gS0IiKQogICAgICAgIHNhbXBsZXMgPSBsb2FkX2F1ZGlvKGF1ZGlvKQogICAgICAgIGxvZyhmIlthc3JdIOmHh+agt+eCuSB7bGVuKHNhbXBsZXMpfSIpCgogICAgICAgIGZyb20gZmFzdGVyX3doaXNwZXIgaW1wb3J0IFdoaXNwZXJNb2RlbAogICAgICAgIG1vZGVsID0gV2hpc3Blck1vZGVsKGFyZ3MubW9kZWwsIGRldmljZT0iY3B1IiwgY29tcHV0ZV90eXBlPSJpbnQ4IikKICAgICAgICBsYW5nID0gYXJncy5sYW5ndWFnZSBvciBOb25lCgogICAgICAgIGRlZiBjb2xsZWN0KHVzZV92YWQpOgogICAgICAgICAgICBzZWdzLCBpbmZvID0gbW9kZWwudHJhbnNjcmliZSgKICAgICAgICAgICAgICAgIHNhbXBsZXMsIGxhbmd1YWdlPWxhbmcsIHZhZF9maWx0ZXI9dXNlX3ZhZCwgYmVhbV9zaXplPTUsCiAgICAgICAgICAgICAgICBjb25kaXRpb25fb25fcHJldmlvdXNfdGV4dD1GYWxzZSwKICAgICAgICAgICAgKQogICAgICAgICAgICBnb3QgPSBbXQogICAgICAgICAgICBmb3Igc2VnIGluIHNlZ3M6CiAgICAgICAgICAgICAgICB0ZXh0ID0gc2ltcGxpZmllZChzZWcudGV4dC5zdHJpcCgpKQogICAgICAgICAgICAgICAgaWYgdGV4dDoKICAgICAgICAgICAgICAgICAgICBnb3QuYXBwZW5kKFtyb3VuZChmbG9hdChzZWcuc3RhcnQpLCAyKSwgdGV4dF0pCiAgICAgICAgICAgIHJldHVybiBnb3QsIGluZm8KCiAgICAgICAgaXRlbXMsIGluZm8gPSBjb2xsZWN0KFRydWUpCiAgICAgICAgdXNlZF92YWQgPSBUcnVlCiAgICAgICAgaWYgbm90IGl0ZW1zOgogICAgICAgICAgICBsb2coIlthc3JdIFZBRCDov4fmu6TlkI7msqHmnInor63pn7PvvIzlhbPmjokgVkFEIOWGjeivleS4gOasoSIpCiAgICAgICAgICAgIGl0ZW1zLCBpbmZvID0gY29sbGVjdChGYWxzZSkKICAgICAgICAgICAgdXNlZF92YWQgPSBGYWxzZQogICAgICAgIGl0ZW1zID0gbWVyZ2UoZHJvcF9ub2lzZShpdGVtcykpCiAgICAgICAgcGF5bG9hZCA9IHsKICAgICAgICAgICAgInNlZ21lbnRzIjogaXRlbXMsCiAgICAgICAgICAgICJsYW5ndWFnZSI6IGdldGF0dHIoaW5mbywgImxhbmd1YWdlIiwgIiIpLAogICAgICAgICAgICAiZHVyYXRpb24iOiByb3VuZChmbG9hdChnZXRhdHRyKGluZm8sICJkdXJhdGlvbiIsIDApIG9yIDApLCAyKSwKICAgICAgICAgICAgImNvdW50IjogbGVuKGl0ZW1zKSwKICAgICAgICAgICAgInZhZCI6IHVzZWRfdmFkLAogICAgICAgIH0KICAgICAgICBwcmludChqc29uLmR1bXBzKHBheWxvYWQsIGVuc3VyZV9hc2NpaT1GYWxzZSkpCiAgICAgICAgcmV0dXJuIDAKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIHByaW50KGpzb24uZHVtcHMoeyJlcnJvciI6IHN0cihleGMpfSwgZW5zdXJlX2FzY2lpPUZhbHNlKSkKICAgICAgICBsb2coZiJbZXJyb3JdIHtleGN9IikKICAgICAgICByZXR1cm4gMQogICAgZmluYWxseToKICAgICAgICBzaHV0aWwucm10cmVlKHRtcCwgaWdub3JlX2Vycm9ycz1UcnVlKQoKCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6CiAgICBzeXMuZXhpdChtYWluKCkpCg==";
+const ASR_BRIDGE_B64 = "IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwojIC0qLSBjb2Rpbmc6IHV0Zi04IC0qLQoiIiJhc3JfYnJpZGdlLnB5IOKAlCDnu5kgT2JzaWRpYW4g5o+S5Lu255So55qE5pys5Zyw6L2s5b2V5qGl44CCCgrnlKjms5XvvJoKICBweXRob24gYXNyX2JyaWRnZS5weSAtLXVybCA86KeG6aKR6ZO+5o6lPiBbLS1tb2RlbCBzbWFsbF0gWy0tbGFuZ3VhZ2UgemhdIFstLXl0ZGxwIHl0LWRscF0KCui+k+WHuu+8iHN0ZG91dCDmnIDlkI7kuIDooYzvvInvvJp7InNlZ21lbnRzIjogW1vnp5IsICLmlofmnKwiXSwgLi4uXSwgImxhbmd1YWdlIjogInpoIiwgImR1cmF0aW9uIjogMjk0LjN9CuaXpeW/l+S4gOW+i+i1sCBzdGRlcnLvvIzkuI3lvbHlk43mj5Lku7bop6PmnpDjgIIKIiIiCmltcG9ydCBhcmdwYXJzZQppbXBvcnQganNvbgppbXBvcnQgb3MKaW1wb3J0IHJlCmltcG9ydCBzaHV0aWwKaW1wb3J0IHN1YnByb2Nlc3MKaW1wb3J0IHN5cwppbXBvcnQgdGVtcGZpbGUKCm9zLmVudmlyb24uc2V0ZGVmYXVsdCgiSEZfRU5EUE9JTlQiLCAiaHR0cHM6Ly9oZi1taXJyb3IuY29tIikKb3MuZW52aXJvbi5zZXRkZWZhdWx0KCJIRl9IVUJfT0ZGTElORSIsICIwIikKCnRyeToKICAgIHN5cy5zdGRvdXQucmVjb25maWd1cmUoZW5jb2Rpbmc9InV0Zi04IikKICAgIHN5cy5zdGRlcnIucmVjb25maWd1cmUoZW5jb2Rpbmc9InV0Zi04IikKZXhjZXB0IEV4Y2VwdGlvbjoKICAgIHBhc3MKCgpkZWYgbG9nKG1zZyk6CiAgICBwcmludChtc2csIGZpbGU9c3lzLnN0ZGVyciwgZmx1c2g9VHJ1ZSkKCgpkZWYgcnVuX2J5dGVzKGNtZCwgdGltZW91dD0xODAwKToKICAgIGxvZygiJCAiICsgIiAiLmpvaW4oY21kKSkKICAgIHJldHVybiBzdWJwcm9jZXNzLnJ1bihjbWQsIGNhcHR1cmVfb3V0cHV0PVRydWUsIHRpbWVvdXQ9dGltZW91dCkKCgpkZWYgZG93bmxvYWRfYXVkaW8odXJsLCB5dGRscCwgdG1wLCBjb29raWU9IiIpOgogICAgb3V0ID0gc3RyKHRtcCAvICJhdWRpby4lKGV4dClzIikKICAgIGNtZCA9IFt5dGRscCwgIi1mIiwgImJlc3RhdWRpb1tleHQ9bTRhXS9iZXN0YXVkaW8vYmVzdCIsCiAgICAgICAgICAgIi0tbm8td2FybmluZ3MiLCAiLS1uby1wbGF5bGlzdCJdCiAgICBpZiBjb29raWU6CiAgICAgICAgY21kICs9IFsiLS1hZGQtaGVhZGVyIiwgZiJDb29raWU6IHtjb29raWV9Il0KICAgIGNtZCArPSBbIi1vIiwgb3V0LCB1cmxdCiAgICBwID0gcnVuX2J5dGVzKGNtZCkKICAgIGZpbGVzID0gW2YgZm9yIGYgaW4gdG1wLmdsb2IoImF1ZGlvLioiKSBpZiBmLmlzX2ZpbGUoKV0KICAgIGlmIG5vdCBmaWxlczoKICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoIumfs+mikeS4i+i9veWksei0pTogIiArIChwLnN0ZGVyciBvciBiIiIpLmRlY29kZSgidXRmLTgiLCAicmVwbGFjZSIpWy01MDA6XSkKICAgIHJldHVybiBmaWxlc1swXQoKCiMg5oqW6Z+z6L+Z57G75bmz5Y+w5rKh5pyJ5bmz5Y+w5a2X5bmV44CB5Lmf5LiN57uZIHl0LWRscCDmipPvvIjopoHmlrDpspwgQ29va2ll77yJ77yMCiMg5pKt5pS+5Zmo6YeM6IO955u05o6l5ou/5YiwIENETiDnm7Tpk77vvIzov5nph4zlsLHnlKggdXJsbGliIOebtOS4i++8jOe7leW8gCB5dC1kbHDjgIIKRElSRUNUX01FRElBX1JFID0gcmUuY29tcGlsZShyIlwuKG1wNHxtNGF8bXAzfHdlYm18YWFjfG00cykoXD98JCkiLCByZS5JKQoKCmRlZiBkb3dubG9hZF9kaXJlY3QodXJsLCB0bXAsIHJlZmVyZXI9Imh0dHBzOi8vd3d3LmRvdXlpbi5jb20vIik6CiAgICBpbXBvcnQgdXJsbGliLnJlcXVlc3QKCiAgICBvdXQgPSB0bXAgLyAiYXVkaW8ubXA0IgogICAgcmVxID0gdXJsbGliLnJlcXVlc3QuUmVxdWVzdCh1cmwsIGhlYWRlcnM9ewogICAgICAgICJVc2VyLUFnZW50IjogKCJNb3ppbGxhLzUuMCAoV2luZG93cyBOVCAxMC4wOyBXaW42NDsgeDY0KSBBcHBsZVdlYktpdC81MzcuMzYgIgogICAgICAgICAgICAgICAgICAgICAgICIoS0hUTUwsIGxpa2UgR2Vja28pIENocm9tZS8xNDAuMC4wLjAgU2FmYXJpLzUzNy4zNiIpLAogICAgICAgICJSZWZlcmVyIjogcmVmZXJlciBvciAiaHR0cHM6Ly93d3cuZG91eWluLmNvbS8iLAogICAgICAgICJBY2NlcHQiOiAiKi8qIiwKICAgIH0pCiAgICBsb2coZiIkIEdFVCB7dXJsWzoxMjBdfeKApiIpCiAgICB3aXRoIHVybGxpYi5yZXF1ZXN0LnVybG9wZW4ocmVxLCB0aW1lb3V0PTE4MCkgYXMgcmVzcCwgb3BlbihvdXQsICJ3YiIpIGFzIGY6CiAgICAgICAgc2h1dGlsLmNvcHlmaWxlb2JqKHJlc3AsIGYpCiAgICBpZiBvdXQuc3RhdCgpLnN0X3NpemUgPCAxMCAqIDEwMjQ6CiAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCLnm7Tpk77kuIvovb3nmoTmlofku7blpKrlsI/vvIzlj6/og73mmK/pmLLnm5fpk77miJblt7Lov4fmnJ8iKQogICAgcmV0dXJuIG91dAoKCmRlZiBsb2FkX2F1ZGlvKHBhdGgsIHNyPTE2MDAwKToKICAgIGltcG9ydCBudW1weSBhcyBucAogICAgcCA9IHJ1bl9ieXRlcyhbImZmbXBlZyIsICItbm9zdGRpbiIsICItaGlkZV9iYW5uZXIiLCAiLWxvZ2xldmVsIiwgImVycm9yIiwKICAgICAgICAgICAgICAgICAgICItaSIsIHN0cihwYXRoKSwgIi1mIiwgInMxNmxlIiwgIi1hYyIsICIxIiwgIi1hciIsIHN0cihzciksICItIl0pCiAgICBpZiBwLnJldHVybmNvZGUgIT0gMCBvciBub3QgcC5zdGRvdXQ6CiAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKCJmZm1wZWcg6Kej56CB5aSx6LSlOiAiICsgKHAuc3RkZXJyIG9yIGIiIikuZGVjb2RlKCJ1dGYtOCIsICJyZXBsYWNlIilbLTQwMDpdKQogICAgcmV0dXJuIG5wLmZyb21idWZmZXIocC5zdGRvdXQsIGR0eXBlPW5wLmludDE2KS5hc3R5cGUoImZsb2F0MzIiKSAvIDMyNzY4LjAKCgp0cnk6CiAgICBmcm9tIG9wZW5jYyBpbXBvcnQgT3BlbkNDCiAgICBUMlMgPSBPcGVuQ0MoInQycyIpCmV4Y2VwdCBFeGNlcHRpb246CiAgICBUMlMgPSBOb25lCgoKZGVmIHNpbXBsaWZpZWQodGV4dCk6CiAgICAiIiJXaGlzcGVyIOWcqOS4reaWh+WPo+mfsy/kuK3oi7Hmt7for7Tml7blj6/og73lkJDlh7rnuYHkvZPvvIznu5/kuIDovaznroDkvZPjgIIiIiIKICAgIGlmIG5vdCB0ZXh0OgogICAgICAgIHJldHVybiB0ZXh0CiAgICByZXR1cm4gVDJTLmNvbnZlcnQodGV4dCkgaWYgVDJTIGVsc2UgdGV4dAoKCk5PSVNFX1JFID0gcmUuY29tcGlsZShyIl5bXHPimarwn461KlxbXCjvvIhdKihtdXNpY3zpn7PkuZB8YXBwbGF1c2V85o6M5aOwfOmdmemfs3xzaWxlbmNlKVtcc+KZqvCfjrUqXF1cKe+8iV0qJCIsIHJlLkkpCgoKZGVmIGRyb3Bfbm9pc2UoaXRlbXMpOgogICAgIiIid2hpc3BlciDlr7nnuq/pn7PkuZDop4bpopHkvJrlkJDlh7ogIk11c2ljIiDov5nnsbvmoIfnrb7vvIzkuI3og73lvZPovazlvZXnlKjjgIIiIiIKICAgIG91dCA9IFtdCiAgICBmb3Igc3RhcnQsIHRleHQgaW4gaXRlbXM6CiAgICAgICAgdCA9ICh0ZXh0IG9yICIiKS5zdHJpcCgpCiAgICAgICAgaWYgbm90IHQgb3IgTk9JU0VfUkUubWF0Y2godCk6CiAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgb3V0LmFwcGVuZChbc3RhcnQsIHRdKQogICAgcmV0dXJuIG91dAoKCmRlZiBtZXJnZShpdGVtcywgbWluX2NoYXJzPTI0LCBtYXhfZ2FwPTguMCwgbWF4X2NoYXJzPTE0MCk6CiAgICBvdXQgPSBbXQogICAgZm9yIHN0YXJ0LCB0ZXh0IGluIGl0ZW1zOgogICAgICAgIGlmIG91dDoKICAgICAgICAgICAgbHMsIGx0ID0gb3V0Wy0xXQogICAgICAgICAgICBlbmRlZCA9IGJvb2wocmUuc2VhcmNoKHIiW+OAgu+8n++8gT8hLu+8mztdJCIsIGx0KSkgYW5kIGxlbihsdCkgPj0gbWluX2NoYXJzCiAgICAgICAgICAgIGlmIChub3QgZW5kZWQgYW5kIGxlbihsdCkgPCBtYXhfY2hhcnMgYW5kIGxlbihsdCkgPCBtaW5fY2hhcnMgKiA0CiAgICAgICAgICAgICAgICAgICAgYW5kIHN0YXJ0IC0gbHMgPD0gbWF4X2dhcCBhbmQgbGVuKGx0KSArIGxlbih0ZXh0KSA8PSBtYXhfY2hhcnMpOgogICAgICAgICAgICAgICAgb3V0Wy0xXSA9IFtscywgKGx0ICsgIiAiICsgdGV4dCkuc3RyaXAoKV0KICAgICAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgb3V0LmFwcGVuZChbc3RhcnQsIHRleHRdKQogICAgcmV0dXJuIG91dAoKCmRlZiBtYWluKCk6CiAgICBhcCA9IGFyZ3BhcnNlLkFyZ3VtZW50UGFyc2VyKCkKICAgIGFwLmFkZF9hcmd1bWVudCgiLS11cmwiLCByZXF1aXJlZD1UcnVlKQogICAgYXAuYWRkX2FyZ3VtZW50KCItLW1vZGVsIiwgZGVmYXVsdD0ic21hbGwiKQogICAgYXAuYWRkX2FyZ3VtZW50KCItLWxhbmd1YWdlIiwgZGVmYXVsdD0iIikKICAgIGFwLmFkZF9hcmd1bWVudCgiLS15dGRscCIsIGRlZmF1bHQ9Inl0LWRscCIpCiAgICBhcC5hZGRfYXJndW1lbnQoIi0tY29va2llIiwgZGVmYXVsdD0iIikKICAgIGFwLmFkZF9hcmd1bWVudCgiLS1tZWRpYS11cmwiLCBkZWZhdWx0PSIiLCBoZWxwPSLmkq3mlL7lmajmipPliLDnmoQgQ0ROIOebtOmTvu+8iOS8mOWFiOS6jiB5dC1kbHDvvIkiKQogICAgYXAuYWRkX2FyZ3VtZW50KCItLXJlZmVyZXIiLCBkZWZhdWx0PSIiKQogICAgYXAuYWRkX2FyZ3VtZW50KCItLXRpbWVvdXQiLCB0eXBlPWludCwgZGVmYXVsdD0xODAwKQogICAgYXJncyA9IGFwLnBhcnNlX2FyZ3MoKQoKICAgIHRtcCA9IHRlbXBmaWxlLm1rZHRlbXAocHJlZml4PSJ2bnMtYXNyLSIpCiAgICB0cnk6CiAgICAgICAgdG1wX3BhdGggPSBfX2ltcG9ydF9fKCJwYXRobGliIikuUGF0aCh0bXApCiAgICAgICAgaWYgYXJncy5tZWRpYV91cmwgYW5kIChESVJFQ1RfTUVESUFfUkUuc2VhcmNoKGFyZ3MubWVkaWFfdXJsKSBvciAiZG91eWludm9kIiBpbiBhcmdzLm1lZGlhX3VybAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb3IgImJ5dGVjZG4iIGluIGFyZ3MubWVkaWFfdXJsKToKICAgICAgICAgICAgdHJ5OgogICAgICAgICAgICAgICAgYXVkaW8gPSBkb3dubG9hZF9kaXJlY3QoYXJncy5tZWRpYV91cmwsIHRtcF9wYXRoLCBhcmdzLnJlZmVyZXIpCiAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgICAgICAgICAgbG9nKGYiW2Fzcl0g55u06ZO+5LiL6L295aSx6LSl77yM5Zue6YCAIHl0LWRscO+8mntleGN9IikKICAgICAgICAgICAgICAgIGF1ZGlvID0gZG93bmxvYWRfYXVkaW8oYXJncy51cmwsIGFyZ3MueXRkbHAsIHRtcF9wYXRoLCBhcmdzLmNvb2tpZSkKICAgICAgICBlbHNlOgogICAgICAgICAgICBhdWRpbyA9IGRvd25sb2FkX2F1ZGlvKGFyZ3MudXJsLCBhcmdzLnl0ZGxwLCB0bXBfcGF0aCwgYXJncy5jb29raWUpCiAgICAgICAgbG9nKGYiW2Fzcl0g6Z+z6aKR5bCx57uqIHthdWRpby5zdGF0KCkuc3Rfc2l6ZSAvLyAxMDI0fSBLQiIpCiAgICAgICAgc2FtcGxlcyA9IGxvYWRfYXVkaW8oYXVkaW8pCiAgICAgICAgbG9nKGYiW2Fzcl0g6YeH5qC354K5IHtsZW4oc2FtcGxlcyl9IikKCiAgICAgICAgZnJvbSBmYXN0ZXJfd2hpc3BlciBpbXBvcnQgV2hpc3Blck1vZGVsCiAgICAgICAgbW9kZWwgPSBXaGlzcGVyTW9kZWwoYXJncy5tb2RlbCwgZGV2aWNlPSJjcHUiLCBjb21wdXRlX3R5cGU9ImludDgiKQogICAgICAgIGxhbmcgPSBhcmdzLmxhbmd1YWdlIG9yIE5vbmUKCiAgICAgICAgZGVmIGNvbGxlY3QodXNlX3ZhZCk6CiAgICAgICAgICAgIHNlZ3MsIGluZm8gPSBtb2RlbC50cmFuc2NyaWJlKAogICAgICAgICAgICAgICAgc2FtcGxlcywgbGFuZ3VhZ2U9bGFuZywgdmFkX2ZpbHRlcj11c2VfdmFkLCBiZWFtX3NpemU9NSwKICAgICAgICAgICAgICAgIGNvbmRpdGlvbl9vbl9wcmV2aW91c190ZXh0PUZhbHNlLAogICAgICAgICAgICApCiAgICAgICAgICAgIGdvdCA9IFtdCiAgICAgICAgICAgIGZvciBzZWcgaW4gc2VnczoKICAgICAgICAgICAgICAgIHRleHQgPSBzaW1wbGlmaWVkKHNlZy50ZXh0LnN0cmlwKCkpCiAgICAgICAgICAgICAgICBpZiB0ZXh0OgogICAgICAgICAgICAgICAgICAgIGdvdC5hcHBlbmQoW3JvdW5kKGZsb2F0KHNlZy5zdGFydCksIDIpLCB0ZXh0XSkKICAgICAgICAgICAgcmV0dXJuIGdvdCwgaW5mbwoKICAgICAgICBpdGVtcywgaW5mbyA9IGNvbGxlY3QoVHJ1ZSkKICAgICAgICB1c2VkX3ZhZCA9IFRydWUKICAgICAgICBpZiBub3QgaXRlbXM6CiAgICAgICAgICAgIGxvZygiW2Fzcl0gVkFEIOi/h+a7pOWQjuayoeacieivremfs++8jOWFs+aOiSBWQUQg5YaN6K+V5LiA5qyhIikKICAgICAgICAgICAgaXRlbXMsIGluZm8gPSBjb2xsZWN0KEZhbHNlKQogICAgICAgICAgICB1c2VkX3ZhZCA9IEZhbHNlCiAgICAgICAgaXRlbXMgPSBtZXJnZShkcm9wX25vaXNlKGl0ZW1zKSkKICAgICAgICBwYXlsb2FkID0gewogICAgICAgICAgICAic2VnbWVudHMiOiBpdGVtcywKICAgICAgICAgICAgImxhbmd1YWdlIjogZ2V0YXR0cihpbmZvLCAibGFuZ3VhZ2UiLCAiIiksCiAgICAgICAgICAgICJkdXJhdGlvbiI6IHJvdW5kKGZsb2F0KGdldGF0dHIoaW5mbywgImR1cmF0aW9uIiwgMCkgb3IgMCksIDIpLAogICAgICAgICAgICAiY291bnQiOiBsZW4oaXRlbXMpLAogICAgICAgICAgICAidmFkIjogdXNlZF92YWQsCiAgICAgICAgfQogICAgICAgIHByaW50KGpzb24uZHVtcHMocGF5bG9hZCwgZW5zdXJlX2FzY2lpPUZhbHNlKSkKICAgICAgICByZXR1cm4gMAogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgcHJpbnQoanNvbi5kdW1wcyh7ImVycm9yIjogc3RyKGV4Yyl9LCBlbnN1cmVfYXNjaWk9RmFsc2UpKQogICAgICAgIGxvZyhmIltlcnJvcl0ge2V4Y30iKQogICAgICAgIHJldHVybiAxCiAgICBmaW5hbGx5OgogICAgICAgIHNodXRpbC5ybXRyZWUodG1wLCBpZ25vcmVfZXJyb3JzPVRydWUpCgoKaWYgX19uYW1lX18gPT0gIl9fbWFpbl9fIjoKICAgIHN5cy5leGl0KG1haW4oKSkK";
 /* EMBEDDED_ASR_BRIDGE_END */
 
 const VIEW_TYPE_PLAYER = "vns-player";
+
+/** 抖音 webview 用独立持久分区：登录态 / Cookie 跨重启保留 */
+const DOUYIN_PARTITION = "persist:vns-douyin";
+/** 分享短链只有手机 UA 才会停在 iesdouyin 落地页，那里才有 canonical / itemId */
+const VNS_UA_MOBILE = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1";
 const VIDEO_EXT = ["mp4", "webm", "mkv", "mov", "m4v", "ogv", "avi", "flv", "ts", "mp3", "m4a", "wav", "flac", "ogg"];
 const BOOK_EXT = ["md", "txt", "epub"];
 
@@ -2427,8 +2432,29 @@ function mergeLines(items, minChars = 24, maxGap = 8, maxChars = 140) {
   return merged;
 }
 
+/**
+ * 从「分享文案」里挖出链接：
+ *   "7.43 复制打开抖音，看看【xxx的作品】… https://v.douyin.com/iRNBho6u/ 复制此链接…"
+ *   "v.douyin.com/iRNBho6u/"（没写 http）
+ * 同时去掉链接尾巴上粘住的中文标点。
+ */
+function extractUrl(raw) {
+  let s = String(raw || "").trim();
+  if (!s) return s;
+  const tail = /[\s，。！？、；：""''（）【】…《》<>]+$/u;
+  if (/^(https?:\/\/|obsidian:\/\/|file:\/\/)/i.test(s)) {
+    const lead = s.match(/^(https?:\/\/|obsidian:\/\/|file:\/\/)[^\s，。！？、；：""''（）【】…《》<>]+/i);
+    return lead ? lead[0] : s;
+  }
+  const full = s.match(/https?:\/\/[^\s，。！？、；：""''（）【】…《》<>]+/i);
+  if (full) return full[0].replace(tail, "");
+  const bare = s.match(/(?:v\.douyin\.com|v\.iesdouyin\.com|www\.douyin\.com|douyin\.com|b23\.tv|bili2233\.cn|bilibili\.com|youtu\.be|youtube\.com)\/[^\s，。！？、；：""''（）【】…《》<>]+/i);
+  if (bare) return `https://${bare[0].replace(tail, "")}`;
+  return s.replace(tail, "");
+}
+
 function detectLink(raw) {
-  const url = String(raw || "").trim();
+  const url = extractUrl(raw);
   let m;
   if ((m = url.match(/bilibili\.com\/video\/(BV[0-9A-Za-z]{6,})/))) {
     const p = url.match(/[?&]p=(\d+)/);
@@ -2438,12 +2464,14 @@ function detectLink(raw) {
       (m = url.match(/youtu\.be\/([0-9A-Za-z_-]{11})/))) {
     return { kind: "youtube", id: m[1], url };
   }
-  if ((m = url.match(/douyin\.com\/video\/(\d+)/))) return { kind: "douyin", id: m[1], url };
-  if (/v\.douyin\.com/.test(url) || /b23\.tv/.test(url)) return { kind: "short", id: "", url };
+  if ((m = url.match(/douyin\.com\/(?:video|note|slides)\/(\d+)/)) ||
+      (m = url.match(/iesdouyin\.com\/share\/(?:video|note)\/(\d+)/))) return { kind: "douyin", id: m[1], url };
+  if (/v\.douyin\.com|v\.iesdouyin\.com|b23\.tv|bili2233\.cn|bili22\.cn/.test(url)) return { kind: "short", id: "", url };
   if (/mp\.weixin\.qq\.com/.test(url)) return { kind: "weixin", id: "", url };
   if (/(pan\.baidu\.com|aliyundrive\.com|alipan\.com|pan\.quark\.cn|123pan\.com|pan\.xunlei\.com|cloud\.189\.cn)/.test(url)) {
     return { kind: "netdisk", id: "", url };
   }
+  if (/^[A-Za-z]:[\\/]/.test(url)) return { kind: "file", id: "", url };
   if (/\.(mp4|webm|mkv|mov|m4v|mp3|m4a|flac|wav|ogg)(\?|$)/i.test(url)) return { kind: "direct", id: "", url };
   if (/^https?:\/\//i.test(url)) return { kind: "web", id: "", url };
   return { kind: "file", id: "", url };
@@ -2555,6 +2583,12 @@ const DEFAULT_SETTINGS = {
   habits: { counters: {}, events: [] },
   biliCookies: {},
   biliUser: null,
+  douyinWebview: true,
+  webviewPages: true,
+  douyinImmersive: true,
+  douyinAspectFit: true,
+  douyinCookieHeader: "",
+  douyinCookieAt: 0,
 };
 
 /* ============================ 播放器视图 ============================ */
@@ -2567,6 +2601,8 @@ class VideoPlayerView extends ItemView {
     this.notePath = null;
     this.videoEl = null;
     this.iframeEl = null;
+    this.webviewEl = null;
+    this.webviewWarnEl = null;
     this.lastKnownTime = 0;
     this.timer = null;
     this.onMessage = this.onMessage.bind(this);
@@ -2586,6 +2622,7 @@ class VideoPlayerView extends ItemView {
   async onClose() {
     this.destroyPlayerChrome();
     this.hideQualityMenu();
+    if (this.webviewEl) { try { this.webviewEl.remove(); } catch (e) { /* ignore */ } this.webviewEl = null; }
   }
 
   onMessage(ev) {
@@ -2760,6 +2797,9 @@ class VideoPlayerView extends ItemView {
       this.audioEl = null;
     }
     if (this.iframeEl) { this.iframeEl.src = "about:blank"; this.iframeEl = null; }
+    if (this.webviewEl) { try { this.webviewEl.remove(); } catch (e) { /* ignore */ } this.webviewEl = null; }
+    if (this.stage) this.stage.removeClass("is-webview");
+    this.webviewWarnEl = null;
 
     // 重置状态
     this.link = null;
@@ -2778,13 +2818,25 @@ class VideoPlayerView extends ItemView {
     const raw = String(input || "").trim();
     if (!raw) return;
     this.plugin.recordHabit("player-load");
-    const link = detectLink(raw);
-    link.url = raw;
+    let link = detectLink(raw);
+    link.url = link.kind === "file" ? raw : extractUrl(raw);
     if (link.kind === "file") {
       const f = this.app.vault.getAbstractFileByPath(normalizePath(raw));
       if (f instanceof TFile) return this.loadFile(f, startAt);
       new Notice("找不到这个本地文件，试着用「本地文件」按钮选择");
       return;
+    }
+    if (link.kind === "short") {
+      this.setStatus("解析分享短链…");
+      try {
+        // 注意传抠出来的短链（link.url），不能传 raw：raw 可能是整段分享文案
+        link = await this.plugin.resolveShortLink(link.url);
+      } catch (e) {
+        new Notice(e.message, 8000);
+        this.stage.empty();
+        this.stage.createDiv({ cls: "vns-empty", text: e.message });
+        return;
+      }
     }
     await this.fillMeta(link);
     this.attach(link, startAt);
@@ -2808,7 +2860,11 @@ class VideoPlayerView extends ItemView {
     this.lastKnownTime = 0;
     if (this.timer) clearInterval(this.timer);
     this.destroyPlayerChrome();
+    this.resetStageAspect();
     this.stage.empty();
+    this.stage.removeClass("is-webview");
+    this.webviewEl = null;
+    this.webviewWarnEl = null;
     this.videoEl = null;
     this.audioEl = null;
     this.iframeEl = null;
@@ -2825,6 +2881,28 @@ class VideoPlayerView extends ItemView {
       }
       this.urlInput.value = f.path;
       this.mountNativePlayer(this.app.vault.getResourcePath(f), { startAt, title: link.title });
+      return;
+    }
+
+    if (link.kind === "douyin") {
+      this.urlInput.value = link.url;
+      if (this.plugin.settings.douyinWebview !== false) {
+        this.mountWebview(link, startAt);
+        this.loadSummaryPanel().catch(() => {});
+        return;
+      }
+      this.stage.createDiv({
+        cls: "vns-empty",
+        text: "抖音已关闭内嵌播放：可在设置里打开「抖音使用内嵌浏览器播放」；生成笔记不受影响。",
+      });
+      this.setStatus("抖音内嵌播放已关闭");
+      return;
+    }
+
+    if (["web", "weixin", "netdisk"].includes(link.kind) && this.plugin.settings.webviewPages !== false) {
+      this.urlInput.value = link.url;
+      this.mountWebview(link, startAt);
+      this.loadSummaryPanel().catch(() => {});
       return;
     }
 
@@ -2925,6 +3003,266 @@ class VideoPlayerView extends ItemView {
     } catch (e) {
       new Notice(`切换画质失败：${e.message}`, 6000);
     }
+  }
+
+  /** 内嵌 webview 播放：抖音、以及 iframe 常被 X-Frame-Options / 反嵌脚本挡住的普通网页 */
+  mountWebview(link, startAt) {
+    const url = link.kind === "douyin" && link.id
+      ? `https://www.douyin.com/video/${link.id}`
+      : link.url;
+    link.url = url;
+    this.stage.addClass("is-webview");
+    const hint = link.kind === "douyin" ? "抖音官方页面加载中…" : "网页加载中（内嵌浏览器，可播放被 iframe 拦截的视频）…";
+    this.webviewWarnEl = this.stage.createDiv({ cls: "vns-webview-hint", text: hint });
+    this.webviewEl = this.plugin.createDouyinWebview(this.stage, url, link.kind);
+    this.webviewEl.addEventListener("did-fail-load", (ev) => {
+      if (ev && (ev.errorCode === -3 || ev.errorCode === 0)) return;
+      if (this.webviewWarnEl) this.webviewWarnEl.setText(`页面加载失败：${ev && ev.errorDescription}`);
+    });
+    this.webviewEl.addEventListener("dom-ready", () => {
+      this.applyWebviewZoom(link.kind === "douyin" ? (this.plugin.settings.douyinZoom || 0.8) : 1);
+      if (link.kind === "douyin" && this.plugin.settings.douyinImmersive !== false) {
+        this.setImmersive(true, { remember: false });
+      }
+      this.onWebviewReady(link, startAt);
+    });
+    this.webviewEl.addEventListener("did-navigate-in-page", () => {
+      if (this.immersive) setTimeout(() => this.setImmersive(true, { remember: false }), 800);
+    });
+    this.mountWebviewZoomBar(link);
+    this.timer = setInterval(() => this.tick(), 1000);
+    this.updateClock();
+  }
+
+  /** 抖音页面很"高"，默认缩到 0.8 才看得到整块视频；这里给一组缩放按钮 */
+  mountWebviewZoomBar(link) {
+    const bar = this.stage.createDiv({ cls: "vns-webview-zoom" });
+    const mk = (label, title, fn) => {
+      const b = bar.createEl("button", { cls: "vns-zoom-btn", text: label });
+      if (title) b.title = title;
+      b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+      return b;
+    };
+    mk("−", "缩小页面", () => this.applyWebviewZoom((this.webviewZoom || 1) * 0.9));
+    mk("+", "放大页面", () => this.applyWebviewZoom((this.webviewZoom || 1) * 1.1));
+    mk("适配", "缩到能看见整页（整块视频）", () => this.applyWebviewZoom(link.kind === "douyin" ? 0.8 : 1));
+    this.cropBtn = mk("比例", "沉浸时播放区按视频真实比例适配（画面完整、不带黑边）；再点恢复固定播放区", () => this.toggleWebviewCrop());
+    this.cropBtn.toggleClass("is-active", this.plugin.settings.douyinAspectFit !== false);
+    this.immersiveBtn = mk("沉浸", "只留视频：隐藏页面头尾/评论区，黑边按「裁切」处理", () => this.setImmersive(!this.immersive));
+    mk("全屏", "把播放器区域全屏", () => this.toggleFullscreen(this.stageWrap));
+    this.syncImmersiveBtn();
+  }
+
+  syncImmersiveBtn() {
+    if (!this.immersiveBtn) return;
+    this.immersiveBtn.setText(this.immersive ? "退出沉浸" : "沉浸");
+    this.immersiveBtn.toggleClass("is-active", !!this.immersive);
+  }
+
+  /** 沉浸去黑边：开=播放区按视频比例适配（完整显示不裁内容），关=固定播放区（可能带黑边） */
+  toggleWebviewCrop() {
+    this.plugin.settings.douyinAspectFit = this.plugin.settings.douyinAspectFit === false;
+    this.plugin.saveSettings().catch(() => {});
+    if (this.cropBtn) this.cropBtn.toggleClass("is-active", this.plugin.settings.douyinAspectFit !== false);
+    if (!this.plugin.settings.douyinAspectFit) this.resetStageAspect();
+    new Notice(this.plugin.settings.douyinAspectFit ? "沉浸画面：按视频比例适配（不裁内容）" : "沉浸画面：固定播放区（可能带黑边）", 2500);
+  }
+
+  /**
+   * 沉浸模式：只留 <video>。三层手段，黑幕只是兜底：
+   * 1. 沿 video→body 祖先链清掉 transform/filter 等会让 position:fixed 失效的属性
+   *    （否则 video 浮不出容器，页面头尾/评论区照旧露着），并给链上每一级抬 z-index；
+   * 2. 把链上每一级的兄弟节点（页面头尾 / 评论区 / 播放器控制条）visibility:hidden，
+   *    相当于把页面剥得只剩播放链；
+   * 3. 全屏黑幕盖住一切漏网内容。
+   * 画面始终 contain 完整显示（一根像素不裁）；黑边由播放区按视频真实比例适配消掉（fitStageToAspect）。
+   * 抖音 SPA 会重渲染（切下个视频、评论区懒加载），注入常驻定时器每秒补妆；
+   * 退出沉浸 = reload 整页，页面内不会留任何东西。
+   */
+  async setImmersive(on, opts = {}) {
+    const remember = opts.remember !== false;
+    this.immersive = !!on;
+    if (remember) {
+      this.plugin.settings.douyinImmersive = !!on;
+      this.plugin.saveSettings().catch(() => {});
+    }
+    this.syncImmersiveBtn();
+    const wv = this.webviewEl;
+    if (!wv) return;
+    if (!on) {
+      this.resetStageAspect();
+      try { wv.reload(); } catch (e) { /* ignore */ }
+      return;
+    }
+    const script = `(() => {
+      const CURTAIN_Z = 2147483000, CHAIN_Z = 2147483200, VIDEO_Z = 2147483600;
+      const hidden = [];
+      const CLEAR = { transform: 'none', filter: 'none', 'backdrop-filter': 'none', perspective: 'none', 'will-change': 'auto', contain: 'none', isolation: 'auto', zoom: 'normal' };
+      // 挑「最能播」的视频：有真实尺寸里面积最大的（querySelector 可能撞上预加载的空 video）
+      const best = () => {
+        const vids = Array.from(document.querySelectorAll('video'));
+        const good = vids.filter((x) => x.videoWidth > 0 && x.videoHeight > 0)
+          .sort((a, b) => (b.videoWidth * b.videoHeight) - (a.videoWidth * a.videoHeight));
+        return good[0] || vids[0] || null;
+      };
+      const apply = () => {
+        const v = best();
+        if (!v) return 'no-video';
+        // 3) 黑幕：盖住漏网内容（不删 DOM，避免打断 React / 播放逻辑）
+        let curtain = document.getElementById('__vns_curtain');
+        if (!curtain) {
+          curtain = document.createElement('div');
+          curtain.id = '__vns_curtain';
+          document.body.appendChild(curtain);
+        }
+        curtain.style.cssText = 'position:fixed;inset:0;background:#000;z-index:' + CURTAIN_Z + ';';
+        // 先把上一轮藏掉的元素放出来：万一被 React 回收进播放链，不能再是隐藏态
+        while (hidden.length) { const el = hidden.pop(); try { el.style.visibility = ''; } catch (e) {} }
+        // 1) + 2)：沿祖先链清 fixed 陷阱、抬层级、藏兄弟
+        let el = v;
+        while (el && el !== document.body) {
+          const parent = el.parentElement;
+          if (!parent) break;
+          for (const sib of parent.children) {
+            if (sib === el || sib.contains(el) || sib.id === '__vns_curtain') continue;
+            const tag = sib.tagName;
+            if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'LINK' || tag === 'NOSCRIPT') continue;
+            if (sib.style.visibility !== 'hidden') { sib.style.visibility = 'hidden'; hidden.push(sib); }
+          }
+          if (el !== v) {
+            el.style.setProperty('z-index', String(CHAIN_Z), 'important');
+            if (getComputedStyle(el).position === 'static') el.style.setProperty('position', 'relative', 'important');
+          }
+          for (const p in CLEAR) el.style.setProperty(p, CLEAR[p], 'important');
+          el = parent;
+        }
+        // video 本体：铺满视口，contain 完整显示不裁内容（黑边由播放区比例适配消掉）
+        v.style.setProperty('position', 'fixed', 'important');
+        v.style.setProperty('inset', '0', 'important');
+        v.style.setProperty('width', '100vw', 'important');
+        v.style.setProperty('height', '100vh', 'important');
+        v.style.setProperty('object-fit', 'contain', 'important');
+        v.style.setProperty('z-index', String(VIDEO_Z), 'important');
+        v.style.setProperty('background', '#000', 'important');
+        // 控制条也被藏了，点画面切播放
+        if (!v.__vnsClick) {
+          v.__vnsClick = true;
+          v.addEventListener('click', () => { if (v.paused) v.play().catch(() => {}); else v.pause(); });
+        }
+        document.documentElement.style.setProperty('overflow', 'hidden', 'important');
+        document.body.style.setProperty('overflow', 'hidden', 'important');
+        return 'ok';
+      };
+      const first = apply();
+      if (window.__vnsImmersiveTimer) clearInterval(window.__vnsImmersiveTimer);
+      window.__vnsImmersiveTimer = setInterval(apply, 1000);
+      const v0 = best();
+      return JSON.stringify({ ok: first === 'ok', aspect: v0 && v0.videoHeight ? v0.videoWidth / v0.videoHeight : 0 });
+    })()`;
+    try {
+      const r = await wv.executeJavaScript(script, true);
+      let j = null;
+      try { j = typeof r === "string" && r.startsWith("{") ? JSON.parse(r) : null; } catch (e) { /* 兼容旧返回 */ }
+      if (!j || !j.ok) {
+        if (this.webviewWarnEl) this.webviewWarnEl.setText("沉浸模式：页面上还没出现 <video>，稍后会自动重试");
+      } else {
+        if (j.aspect > 0.05 && this.plugin.settings.douyinAspectFit !== false) this.fitStageToAspect(j.aspect);
+        if (this.webviewWarnEl) this.webviewWarnEl.setText("沉浸模式：只显示视频（完整画面不裁内容，点画面暂停/续播，再点「退出沉浸」恢复整页）");
+      }
+    } catch (e) { console.debug("[vns] 沉浸模式注入失败", e.message); }
+  }
+
+  applyWebviewZoom(z) {
+    this.webviewZoom = Math.min(2, Math.max(0.35, Number(z) || 1));
+    try {
+      if (this.webviewEl && typeof this.webviewEl.setZoomFactor === "function") {
+        this.webviewEl.setZoomFactor(this.webviewZoom);
+      }
+    } catch (e) { /* webview 可能还没挂载完 */ }
+    this.plugin.settings.douyinZoom = this.webviewZoom;
+    this.plugin.saveSettings().catch(() => {});
+  }
+
+  /** 沉浸去黑边：播放区缩放成视频真实比例（画面 contain 完整显示，一根像素不裁） */
+  fitStageToAspect(aspect) {
+    if (!this.stage || !this.stageWrap || !isFinite(aspect) || aspect <= 0.05) return;
+    if (this.stageAspect && Math.abs(this.stageAspect - aspect) < 0.01) return;
+    this.stageAspect = aspect;
+    const availH = Math.min(Math.max(window.innerHeight * 0.72, 420), 980); // 与 .is-webview 的 clamp 同参
+    const availW = this.stageWrap.clientWidth || 800;
+    let h = availH, w = h * aspect;
+    if (w > availW) { w = availW; h = w / aspect; }
+    this.stage.style.width = `${Math.round(w)}px`;
+    this.stage.style.height = `${Math.round(h)}px`;
+  }
+
+  resetStageAspect() {
+    this.stageAspect = 0;
+    if (!this.stage) return;
+    this.stage.style.width = "";
+    this.stage.style.height = "";
+  }
+
+  async onWebviewReady(link, startAt) {
+    const wv = this.webviewEl;
+    if (!wv) return;
+    this.setStatus("内嵌页面已就绪，正在找播放器…");
+    try {
+      await wv.executeJavaScript(
+        "(() => { const v = document.querySelector('video'); if (v) { v.muted = false; v.play().catch(() => {}); } return 1; })()", true);
+    } catch (e) { /* 页面可能还没渲染完，轮询里会再试 */ }
+    if (startAt > 2) this.webviewSeek(startAt);
+
+    const started = Date.now();
+    const poll = async () => {
+      if (!this.webviewEl || this.webviewEl !== wv || !this.link) return;
+      const st = await this.plugin.readDouyinState(wv);
+      if (this.immersive && this.plugin.settings.douyinAspectFit !== false && st.vw > 0 && st.vh > 0) {
+        this.fitStageToAspect(st.vw / st.vh);
+      }
+      const media = this.plugin.pickDouyinMedia(st);
+      if (media) {
+        this.link.mediaUrl = media;
+        if (st.dur) this.link.duration = st.dur;
+        if (this.webviewWarnEl) {
+          this.webviewWarnEl.setText(`已连通播放器${st.dur ? `（${fmtTime(st.dur)}）` : ""}：可直接打时间戳 / 生成笔记`);
+        }
+        this.setStatus("就绪");
+        if (link.kind === "douyin") this.plugin.harvestDouyinCookies(wv).catch(() => {});
+        return;
+      }
+      if (Date.now() - started < 25000) {
+        if (this.webviewWarnEl && /加载中/.test(this.webviewWarnEl.textContent || "")) {
+          this.webviewWarnEl.setText("页面已加载，等待播放器就绪…（点一下画面里的播放键会更快）");
+        }
+        setTimeout(poll, 900);
+      } else {
+        if (link.kind === "douyin") this.plugin.harvestDouyinCookies(wv).catch(() => {});
+        if (this.webviewWarnEl) {
+          this.webviewWarnEl.setText(st && st.hasVideo
+            ? "有播放器但还没拿到地址：点一下画面里的播放键试试"
+            : "页面已加载（没找到 <video>）：视频可能需要登录或点播放");
+        }
+      }
+    };
+    setTimeout(poll, 700);
+  }
+
+  /** 在 webview 里执行一段 JS（失败静默返回 null） */
+  async webviewExec(code) {
+    const wv = this.webviewEl;
+    if (!wv || typeof wv.executeJavaScript !== "function") return null;
+    try { return await wv.executeJavaScript(code, true); } catch (e) { return null; }
+  }
+
+  webviewSeek(sec) {
+    const s = Math.max(0, sec || 0);
+    this.lastKnownTime = s;
+    this.webviewExec(`(() => { const v = document.querySelector('video'); if (v) { v.currentTime = ${s}; v.play().catch(() => {}); } return 1; })()`);
+  }
+
+  webviewTogglePlay() {
+    this.webviewExec("(() => { const v = document.querySelector('video'); if (v) { if (v.paused) v.play().catch(() => {}); else v.pause(); } return 1; })()");
   }
 
   mountIframe(src) {
@@ -3062,6 +3400,7 @@ class VideoPlayerView extends ItemView {
   hidePlayerMsg() { if (this.playerMsg) this.playerMsg.addClass("is-hidden"); }
 
   togglePlay() {
+    if (this.webviewEl) { this.webviewTogglePlay(); return; }
     if (!this.videoEl) return;
     if (this.videoEl.paused) this.videoEl.play().catch((e) => this.showPlayerMsg(`播放失败：${e.message}`));
     else this.videoEl.pause();
@@ -3169,7 +3508,9 @@ class VideoPlayerView extends ItemView {
       } else if (this.link.kind === "bilibili") {
         this.iframeEl.src = embedFor(this.link, s);
       }
+      return;
     }
+    if (this.webviewEl) this.webviewSeek(s);
   }
 
   tick() {
@@ -3181,6 +3522,21 @@ class VideoPlayerView extends ItemView {
         this.iframeEl.contentWindow.postMessage(
           JSON.stringify({ event: "command", func: "getCurrentTime", args: [] }), "*");
       } catch (e) { /* 跨域忽略 */ }
+    } else if (this.webviewEl) {
+      this.webviewExec("(() => { const vids = Array.from(document.querySelectorAll('video')).filter((x) => x.videoWidth > 0 && x.videoHeight > 0).sort((a, b) => (b.videoWidth * b.videoHeight) - (a.videoWidth * a.videoHeight)); const v = vids[0] || document.querySelector('video'); return v ? JSON.stringify({ t: v.currentTime, w: v.videoWidth, h: v.videoHeight }) : ''; })()")
+        .then((raw) => {
+          let st = null;
+          try { st = raw ? JSON.parse(raw) : null; } catch (e) { /* 兼容旧返回 */ }
+          if (st && typeof st === "object") {
+            if (typeof st.t === "number" && st.t >= 0) this.lastKnownTime = st.t;
+            if (this.immersive && this.plugin.settings.douyinAspectFit !== false && st.w > 0 && st.h > 0) {
+              this.fitStageToAspect(st.w / st.h);
+            }
+          } else if (typeof raw === "number" && raw >= 0) {
+            this.lastKnownTime = raw;
+          }
+        })
+        .catch(() => {});
     } else if (this.iframeEl) {
       this.lastKnownTime += 0.5;
     }
@@ -3196,9 +3552,15 @@ class VideoPlayerView extends ItemView {
     return this.lastKnownTime || 0;
   }
 
+  /** 播放器时长（webview / iframe 场景也可用） */
+  currentDuration() {
+    if (this.videoEl && isFinite(this.videoEl.duration)) return this.videoEl.duration || 0;
+    return (this.link && this.link.duration) || 0;
+  }
+
   async captureTimestamp() {
     if (!this.link) { new Notice("先加载一个视频"); return; }
-    const t = await this.plugin.askTime(this.currentTime(), this.videoEl ? this.videoEl.duration : 0);
+    const t = await this.plugin.askTime(this.currentTime(), this.currentDuration());
     if (t === null) return;
     const url = tsLink(this.link, t, this.plugin.settings.timestampMode);
     const line = `- [${fmtTime(t)}](${url}) `;
@@ -3291,6 +3653,33 @@ class VnsSettingTab extends PluginSettingTab {
       }));
     toggle("打开笔记时自动打开播放器", "autoOpenPlayerOnNote", "打开带 source 视频链接的笔记时，自动在播放器里加载该视频（不抢焦点）");
     toggle("B站 使用原生播放器（实验）", "biliNative", "走 playurl 直链 + 自绘控制条；失败会自动回退内嵌播放器。目前部分环境解析不通，默认关闭");
+
+    containerEl.createEl("h3", { text: "抖音" });
+    toggle("抖音使用内嵌浏览器播放", "douyinWebview",
+      "用 Electron webview 打开抖音官方播放页（iframe 会被 X-Frame-Options 和反嵌脚本挡住）。关闭后只能生成笔记，不能内嵌播放");
+    toggle("网页用内嵌浏览器打开", "webviewPages",
+      "普通网页 / 公众号 / 网盘链接改用 webview 打开，能播出被 iframe 拦死的网页视频；关掉则退回 iframe 或提示");
+    toggle("抖音默认沉浸（只留视频）", "douyinImmersive",
+      "打开抖音播放页时隐藏头尾/评论区，只留视频本体；播放器右上角「退出沉浸」可随时恢复整页");
+    toggle("沉浸模式按视频比例适配（去黑边，不裁内容）", "douyinAspectFit",
+      "沉浸时把播放区缩放成视频的真实比例，画面完整显示、上下黑边消失；关掉则播放区固定大小（可能带黑边）。播放器右上角「比例」按钮可随时切换");
+    new Setting(containerEl).setName("抖音 Cookie").setDesc(`${this.plugin.douyinCookieInfo()}。打开抖音播放页或生成笔记时自动抓取，供 yt-dlp / 转录使用`)
+      .addButton((b) => b.setButtonText("重新抓取").onClick(async () => {
+        b.setDisabled(true);
+        try {
+          const r = await this.plugin.probeDouyinCookies();
+          new Notice(r && r.cookie ? `已抓取抖音 Cookie：${this.plugin.douyinCookieInfo()}` : "没抓到 Cookie，试试在窗口里登录一次", 8000);
+          this.display();
+        } catch (e) {
+          new Notice(`抓取失败：${e.message}`, 8000);
+        } finally { b.setDisabled(false); }
+      }))
+      .addButton((b) => b.setButtonText("清空").onClick(async () => {
+        this.plugin.settings.douyinCookieHeader = "";
+        this.plugin.settings.douyinCookieAt = 0;
+        await this.plugin.saveSettings();
+        this.display();
+      }));
     new Setting(containerEl).setName("测试本地转录").setDesc("检查 Python、faster-whisper 与 asr_bridge.py 是否就位")
       .addButton((b) => b.setButtonText("运行测试").onClick(async () => {
         b.setDisabled(true);
@@ -3724,6 +4113,127 @@ class BiliLoginModal extends Modal {
   }
 }
 
+/* ============================ 抖音抓取小窗 ============================ */
+
+/**
+ * 打开抖音播放页，等 <video> 真正拿到播放地址后关窗返回。
+ * 顺带把 Cookie 写回设置，供 yt-dlp / 转录使用。
+ */
+class DouyinCaptureModal extends Modal {
+  constructor(app, plugin, link, opts = {}) {
+    super(app);
+    this.plugin = plugin;
+    this.link = link;
+    this.opts = opts;
+    this.done = false;
+    this.timer = null;
+    this.hardTimer = null;
+    this.wv = null;
+    this.onDone = null;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("vns-douyin-modal");
+    contentEl.createEl("h3", { text: "抖音：抓取播放地址" });
+    this.statusEl = contentEl.createDiv({
+      cls: "vns-setting-note",
+      text: "正在打开抖音页面…首次可能需要登录 / 点一下播放键，抓到地址会自动关窗。",
+    });
+    const actionRow = contentEl.createDiv({ cls: "vns-login-actions" });
+    actionRow.createEl("button", { text: "跳过，直接生成笔记" }).addEventListener("click", () => this.finish(null));
+    const frame = contentEl.createDiv({ cls: "vns-douyin-frame" });
+
+    const url = this.link.kind === "douyin" && this.link.id
+      ? `https://www.douyin.com/video/${this.link.id}`
+      : this.link.url;
+    try {
+      this.wv = this.plugin.createDouyinWebview(frame, url);
+    } catch (e) {
+      this.statusEl.setText(`内嵌浏览器不可用：${e.message}`);
+      return;
+    }
+
+    this.wv.addEventListener("dom-ready", () => this.afterReady());
+    this.wv.addEventListener("did-fail-load", (ev) => {
+      if (ev && (ev.errorCode === -3 || ev.errorCode === 0)) return;
+      this.statusEl.setText(`页面加载失败：${ev && ev.errorDescription}`);
+    });
+    this.wv.style.height = "72vh";
+    this.hardTimer = setTimeout(() => this.finish(null, "超时没抓到播放地址"), 45000);
+  }
+
+  afterReady() {
+    const wv = this.wv;
+    // 尽力自动播放（抖音可能要求一次用户手势）
+    wv.executeJavaScript("(() => { const v = document.querySelector('video'); if (v) v.play().catch(() => {}); return 1; })()", true).catch(() => {});
+    const started = Date.now();
+    const poll = async () => {
+      if (this.done || !this.wv) return;
+      if (this.opts.cookieOnly && Date.now() - started > 4000) {
+        const cookie = await this.plugin.harvestDouyinCookies(wv).catch(() => "");
+        this.finish({ cookie, mediaUrl: "" });
+        return;
+      }
+      const st = await this.plugin.readDouyinState(wv);
+      if (st && st.notFound) {
+        this.finish(null, "抖音说这个视频不存在（可能已删除/仅自己可见）");
+        return;
+      }
+      if (st && st.src) {
+        const cookie = await this.plugin.harvestDouyinCookies(wv).catch(() => "");
+        this.plugin.settings.douyinCookieAt = Date.now();
+        this.finish({
+          mediaUrl: st.src,
+          duration: Math.round(st.dur || 0),
+          title: (st.desc || "").trim() || (st.title || "").replace(/\s*-\s*抖音.*$/, "").trim(),
+          desc: (st.desc || "").trim(),
+          author: (st.author || "").trim(),
+          stats: [
+            st.likes ? `点赞 ${st.likes}` : "",
+            st.comments ? `评论 ${st.comments}` : "",
+            st.collects ? `收藏 ${st.collects}` : "",
+            st.shares ? `分享 ${st.shares}` : "",
+          ].filter(Boolean).join(" ｜ "),
+          cookie,
+        });
+        return;
+      }
+      if (Date.now() - started > 40000) { this.finish(null, "没抓到播放地址（试试在窗口里登录后再来）"); return; }
+      this.statusEl.setText(st && st.hasVideo
+        ? "检测到播放器，等它开始播放…（点一下窗口里的播放键会更快）"
+        : "页面已加载，正在等待播放器…");
+      this.timer = setTimeout(poll, 900);
+    };
+    this.timer = setTimeout(poll, 700);
+  }
+
+  finish(result, tip) {
+    if (this.done) return;
+    this.done = true;
+    if (this.timer) clearTimeout(this.timer);
+    if (this.hardTimer) clearTimeout(this.hardTimer);
+    const cb = this.onDone;
+    this.onDone = null;
+    this.close();
+    if (cb) cb(result);
+    if (tip) new Notice(`抖音抓取：${tip}`, 6000);
+  }
+
+  onClose() {
+    if (this.timer) clearTimeout(this.timer);
+    if (this.hardTimer) clearTimeout(this.hardTimer);
+    if (this.wv) { try { this.wv.remove(); } catch (e) { /* ignore */ } this.wv = null; }
+    this.contentEl.empty();
+    if (!this.done) {
+      this.done = true;
+      const cb = this.onDone;
+      this.onDone = null;
+      if (cb) cb(null);
+    }
+  }
+}
+
 /* ============================ 主插件 ============================ */
 
 class VideoNoteStudio extends Plugin {
@@ -3740,8 +4250,7 @@ class VideoNoteStudio extends Plugin {
     this.registerEvent(this.app.workspace.on("file-open", (file) => {
       this.maybeAutoOpenPlayer(file).catch((e) => console.debug("[vns] 自动打开播放器失败", e));
     }));
-    this.addRibbonIcon("play-circle", "打开视频播放器", () => this.openPlayer());
-    this.addSettingTab(new VnsSettingTab(this.app, this));
+    this.addRibbonIcon("play-circle", "打开视频播放器", () => this.openPlayer());    this.addSettingTab(new VnsSettingTab(this.app, this));
 
     const cmd = (id, name, fn) => this.addCommand({ id, name, callback: () => { this.recordHabit(id); Promise.resolve(fn()).catch((e) => this.fail(e)); } });
 
@@ -3759,6 +4268,10 @@ class VideoNoteStudio extends Plugin {
     cmd("distill-book", "拆书：书籍转章节笔记", () => this.distillBookPrompt());
     cmd("enrich-clippings", "补全 Clippings 里的视频剪藏", () => this.enrichClippings());
     cmd("write-habits", "生成使用习惯笔记", () => this.writeHabitNote());
+    cmd("douyin-cookie", "抖音：打开页面抓取 Cookie", async () => {
+      const r = await this.probeDouyinCookies();
+      new Notice(r && r.cookie ? `抖音 Cookie 已更新（${this.douyinCookieInfo()}）` : "没抓到 Cookie，试试在窗口里登录一次", 8000);
+    });
 
     this.app.workspace.onLayoutReady(() => this.rebuildIndex());
     this.registerEvent(this.app.vault.on("rename", (f, old) => this.reindexFile(f, old)));
@@ -3989,6 +4502,7 @@ class VideoNoteStudio extends Plugin {
   }
 
   async handleVnsProtocol(params) {
+    if (params && params.cmd === "diag") { await this.runDouyinDiag(); return; }
     const u = (params && params.u) || "";
     const t = Math.max(0, parseInt((params && params.t) || "0", 10) || 0);
     if (!u) return;
@@ -4003,6 +4517,59 @@ class VideoNoteStudio extends Plugin {
       view.seek(t);
     }
     if (t > 0) new Notice(`已跳转到 ${fmtTime(t)}`, 2000);
+  }
+
+  async runDouyinDiag() {
+    const out = { at: new Date().toISOString(), steps: [] };
+    const modal = new Modal(this.app);
+    const wv = document.createElement("webview");
+    wv.setAttribute("partition", DOUYIN_PARTITION);
+    wv.setAttribute("src", "https://www.douyin.com/video/7298145681699622182");
+    wv.style.width = "100%";
+    wv.style.height = "100%";
+    modal.onOpen = () => {
+      modal.contentEl.addClass("vns-douyin-modal");
+      modal.contentEl.createEl("h3", { text: "抖音诊断（结果写到 _meta/vns-douyin-diag.json）" });
+      const box = modal.contentEl.createDiv({ cls: "vns-douyin-frame" });
+      box.appendChild(wv);
+    };
+    modal.onClose = () => { try { wv.remove(); } catch (e) { /* ignore */ } modal.contentEl.empty(); };
+    modal.open();
+
+    const js = (code) => wv.executeJavaScript(code, true);
+    const dump = async () => {
+      try {
+        out.webviewTag = typeof wv.executeJavaScript;
+        out.getWebContentsType = typeof wv.getWebContents;
+        out.getURL = typeof wv.getURL === "function" ? wv.getURL() : "(no getURL)";
+        out.href = await js("location.href");
+        out.readyState = await js("document.readyState");
+        out.title = await js("document.title");
+        out.text = String(await js("((document.body && document.body.innerText) || '').slice(0, 500)"));
+        out.videos = await js("document.querySelectorAll('video').length");
+        out.vsrc = await js("(() => { const v = document.querySelector('video'); return v ? (v.currentSrc || v.src || '') : ''; })()");
+        out.docCookie = String(await js("document.cookie") || "").slice(0, 300);
+        if (typeof wv.getWebContents === "function") {
+          const wc = wv.getWebContents();
+          out.wcOk = !!wc;
+          if (wc && wc.session && wc.session.cookies) {
+            const list = await wc.session.cookies.get({});
+            out.cookieCount = (list || []).length;
+            out.cookies = (list || []).filter((c) => String(c.domain).includes("douyin"))
+              .map((c) => `${c.domain}|${c.name}`);
+          }
+        }
+      } catch (e) {
+        out.error = String((e && e.message) || e);
+      }
+      try {
+        const fsx = require("fs");
+        fsx.writeFileSync(require("path").join(require("os").tmpdir(), "vns-douyin-diag.json"),
+          JSON.stringify(out, null, 2));
+      } catch (e) { console.debug("[vns] 诊断写入失败", e.message); }
+    };
+    setTimeout(() => { dump(); }, 9000);
+    setTimeout(() => { try { modal.close(); } catch (e) { /* ignore */ } }, 40000);
   }
 
   pickLocalVideo(cb) { new LocalVideoSuggest(this.app, cb).open(); }
@@ -4096,8 +4663,244 @@ class VideoNoteStudio extends Plugin {
     return headers;
   }
 
-  async applyBiliCookies() {
-    const cookies = this.settings.biliCookies || {};
+  /* ---------- 抖音 & 分享短链 ---------- */
+
+  douyinCookieHeader() { return String(this.settings.douyinCookieHeader || "").trim(); }
+
+  douyinCookieInfo() {
+    const header = this.douyinCookieHeader();
+    if (!header) return "还没有 Cookie（打开一次抖音播放页会自动抓取）";
+    const at = this.settings.douyinCookieAt ? new Date(this.settings.douyinCookieAt) : null;
+    return `${Math.max(1, Math.round(header.length / 1024))} KB${at ? `，抓取于 ${at.toLocaleString()}` : ""}`;
+  }
+
+  /**
+   * 解析 v.douyin.com / b23.tv 这类分享短链。
+   * 抖音短链只有手机 UA 才停在 iesdouyin 分享落地页，页面里有 canonical / itemId。
+   */
+  async resolveShortLink(rawUrl) {
+    // 防御到底：调用方可能直接把整段分享文案塞进来，先抠一遍 URL
+    const key = extractUrl(String(rawUrl || "").trim());
+    if (!key || !/^https?:\/\//i.test(key)) throw new Error("没认出可解析的链接，试试直接粘贴视频页链接");
+    this.shortCache = this.shortCache || new Map();
+    if (this.shortCache.has(key)) return this.shortCache.get(key);
+
+    const res = await requestUrl({
+      url: key, method: "GET", throw: false,
+      headers: {
+        "User-Agent": VNS_UA_MOBILE,
+        "Accept-Language": "zh-CN,zh;q=0.9",
+        Referer: "https://www.douyin.com/",
+      },
+    });
+    const html = res.text || "";
+    const pick = (re) => { const m = html.match(re); return m ? decodeEnt(m[1]).trim() : ""; };
+    const canonical = pick(/<link[^>]+rel=["']canonical["'][^>]*href=["']([^"']+)["']/i) ||
+      pick(/<meta[^>]+property=["']og:url["'][^>]*content=["']([^"']+)["']/i);
+
+    let resolved = null;
+    for (const candidate of [canonical, key]) {
+      if (!candidate) continue;
+      const l = detectLink(candidate);
+      if (l.kind !== "short") { resolved = l; break; }
+    }
+    if (!resolved) {
+      const idm = html.match(/\/video\/(\d{15,})/) || html.match(/"itemId"\s*:\s*"?(\d{15,})/) ||
+        html.match(/\/share\/video\/(\d{15,})/);
+      const bv = html.match(/bilibili\.com\/video\/(BV[0-9A-Za-z]{10})/);
+      if (idm) resolved = { kind: "douyin", id: idm[1], url: `https://www.douyin.com/video/${idm[1]}` };
+      else if (bv) resolved = { kind: "bilibili", id: bv[1], page: 1, url: `https://www.bilibili.com/video/${bv[1]}` };
+    }
+    if (!resolved) throw new Error("短链解析失败：可能已过期，直接粘贴视频页链接试试");
+
+    resolved.url = resolved.url || key;
+    resolved.shortUrl = key;
+    this.shortCache.set(key, resolved);
+    return resolved;
+  }
+
+  /** 统一入口：任意链接 → 识别结果（短链会自动展开） */
+  async resolveLink(raw) {
+    const url = String(raw || "").trim();
+    const link = detectLink(url);
+    link.url = url;
+    if (link.kind !== "short") return link;
+    const r = await this.resolveShortLink(url);
+    return r;
+  }
+
+  /** yt-dlp 取元数据（抖音需要新鲜 Cookie） */
+  async ytDlpJson(url, extraArgs = []) {
+    if (!cp || !this.settings.ytDlpPath) throw new Error("没有可用的 yt-dlp");
+    const fs = require("fs");
+    const os = require("os");
+    const pathApi = require("path");
+    const tmp = fs.mkdtempSync(pathApi.join(os.tmpdir(), "vns-meta-"));
+    try {
+      const args = ["--dump-single-json", "--skip-download", "--no-warnings", "--no-playlist",
+        ...extraArgs, url];
+      const out = await runProcess(this.settings.ytDlpPath, args, tmp, 90 * 1000);
+      const line = String(out).trim().split(/\r?\n/).filter(Boolean).pop() || "{}";
+      return JSON.parse(line);
+    } finally {
+      try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+    }
+  }
+
+  /** 抖音元数据：yt-dlp + Cookie 为主，分享页 HTML 兜底 */
+  async douyinMeta(link, fast = false) {
+    const meta = { title: link.url, author: "", published: "", duration: 0, description: "", extra: "抖音" };
+    const cookie = this.douyinCookieHeader();
+    let ytErr = "";
+    if (!fast) try {
+      const j = await this.ytDlpJson(link.url, cookie ? ["--add-header", `Cookie: ${cookie}`] : []);
+      meta.title = j.title || j.fulltitle || meta.title;
+      meta.author = j.uploader || j.channel || j.creator || "";
+      meta.duration = Math.round(j.duration || 0);
+      meta.description = j.description || "";
+      meta.thumb = j.thumbnail || "";
+      meta.published = j.upload_date ? String(j.upload_date).replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3") : "";
+      meta.stats = [j.like_count ? `点赞 ${j.like_count}` : "", j.comment_count ? `评论 ${j.comment_count}` : ""]
+        .filter(Boolean).join(" ｜ ");
+      if (!String(meta.title).trim() || /^https?:/i.test(meta.title)) throw new Error("yt-dlp 没给出标题");
+      return meta;
+    } catch (e) {
+      ytErr = e.message;
+      console.debug("[vns] 抖音 yt-dlp 元数据失败", ytErr);
+    }
+    try {
+      const res = await requestUrl({
+        url: link.url, method: "GET", throw: false,
+        headers: { "User-Agent": VNS_UA_MOBILE, Referer: "https://www.douyin.com/" },
+      });
+      const html = res.text || "";
+      const pick = (re) => { const m = html.match(re); return m ? decodeEnt(m[1]).trim() : ""; };
+      meta.title = pick(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)/i) ||
+        pick(/<title[^>]*>([\s\S]*?)<\/title>/i) || meta.title;
+      meta.description = pick(/<meta[^>]+(?:property|name)=["'](?:og:)?description["'][^>]*content=["']([^"']+)/i);
+      meta.html = html;
+    } catch (e) {
+      meta.error = ytErr ? `${ytErr}；${e.message}` : e.message;
+    }
+    return meta;
+  }
+
+  /** 在任意容器里挂一个复用抖音分区的 webview */
+  createDouyinWebview(container, url, kind) {
+    const wv = document.createElement("webview");
+    wv.setAttribute("partition", kind && kind !== "douyin" ? "persist:vns-web" : DOUYIN_PARTITION);
+    wv.setAttribute("src", url);
+    wv.setAttribute("webpreferences", "backgroundThrottling=false");
+    wv.className = "vns-webview";
+    wv.style.width = "100%";
+    wv.style.height = "100%";
+    container.appendChild(wv);
+    return wv;
+  }
+
+  /** 读取 webview 里 <video> 的状态 + 页面上的标题/作者/互动数（抖音页面是 JS 渲染，DOM 里才有真数据） */
+  async readDouyinState(wv) {
+    if (!wv || typeof wv.executeJavaScript !== "function") return {};
+    const js = `(() => {
+      const v = (() => { const vids = Array.from(document.querySelectorAll('video')).filter((x) => x.videoWidth > 0 && x.videoHeight > 0).sort((a, b) => (b.videoWidth * b.videoHeight) - (a.videoWidth * a.videoHeight)); return vids[0] || document.querySelector('video'); })();
+      const pick = (sel) => { const el = document.querySelector(sel); return el ? (el.innerText || el.textContent || '').trim() : ''; };
+      const bodyText = ((document.body && document.body.innerText) || '').slice(0, 4000);
+      return JSON.stringify({
+        hasVideo: !!v,
+        src: v ? (v.currentSrc || v.src || '') : '',
+        t: v ? v.currentTime : 0,
+        dur: v && isFinite(v.duration) ? v.duration : 0,
+        vw: v ? v.videoWidth : 0,
+        vh: v ? v.videoHeight : 0,
+        paused: v ? v.paused : true,
+        title: document.title || '',
+        notFound: /视频不存在|作品已删除|内容不可见|已下架/.test(bodyText),
+        desc: pick('[data-e2e="video-desc"]') || pick('h1'),
+        author: pick('[data-e2e="user-info"] a') || pick('[data-e2e="video-author"]') || pick('.author-name'),
+        likes: pick('[data-e2e="like-count"]'),
+        comments: pick('[data-e2e="comment-count"]'),
+        collects: pick('[data-e2e="collect-count"]'),
+        shares: pick('[data-e2e="share-count"]'),
+        hasRouterData: !!window._ROUTER_DATA,
+        mediaUrls: (performance.getEntriesByType('resource') || [])
+          .map((e) => e.name)
+          .filter((u) => /(\\.mp4|\\.m4s|\\.m3u8|douyinvod|bytecdn|byteoversea)/i.test(u))
+          .slice(-12)
+      });
+    })()`;
+    try {
+      const raw = await wv.executeJavaScript(js, true);
+      return JSON.parse(raw || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /**
+   * 从页面状态里挑一个能下载的媒体 URL。
+   * 抖音网页播放器走 MSE，<video>.currentSrc 是 blob:，只能从资源时序里找真地址。
+   */
+  pickDouyinMedia(st) {
+    const urls = (st && st.mediaUrls) || [];
+    const byExt = (re) => urls.filter((u) => re.test(u)).pop() || "";
+    const m3u8 = byExt(/\.m3u8(\?|$)/i);
+    if (m3u8) return m3u8;
+    const mp4 = byExt(/\.mp4(\?|$)/i);
+    if (mp4) return mp4;
+    const cdn = byExt(/douyinvod|bytecdn|byteoversea/i);
+    if (cdn) return cdn;
+    const src = (st && st.src) || "";
+    return /^https?:/i.test(src) ? src : "";
+  }
+
+  /** 从 webview 会话里抓抖音 Cookie（yt-dlp / 直链下载用） */
+  async harvestDouyinCookies(wv) {
+    let list = null;
+    try {
+      const wc = wv && typeof wv.getWebContents === "function" ? wv.getWebContents() : null;
+      if (wc && wc.session && wc.session.cookies) {
+        const all = await wc.session.cookies.get({});
+        list = (all || []).filter((c) => String(c.domain || "").includes("douyin"));
+      }
+    } catch (e) {
+      console.debug("[vns] webview Cookie 读取失败", e.message);
+    }
+    if (!list || !list.length) {
+      try {
+        const raw = await wv.executeJavaScript("document.cookie", true);
+        list = String(raw || "").split(";").map((s) => {
+          const i = s.indexOf("=");
+          return i > 0 ? { name: s.slice(0, i).trim(), value: s.slice(i + 1).trim() } : null;
+        }).filter(Boolean);
+      } catch (e) { /* ignore */ }
+    }
+    const header = (list || []).map((c) => `${c.name}=${c.value}`).join("; ");
+    if (header) {
+      this.settings.douyinCookieHeader = header;
+      this.settings.douyinCookieAt = Date.now();
+      await this.saveSettings();
+      console.debug("[vns] 抖音 Cookie 已抓取", list.length, "条");
+    }
+    return header;
+  }
+
+  /** 用独立小窗打开抖音页面，抓播放地址 + Cookie（生成笔记时用） */
+  async captureDouyinMedia(link, opts = {}) {
+    if (this.settings.douyinWebview === false) return null;
+    const modal = new DouyinCaptureModal(this.app, this, link, opts);
+    return new Promise((resolve) => { modal.onDone = resolve; modal.open(); });
+  }
+
+  /** 只为拿 Cookie：打开抖音首页，抓完即关 */
+  async probeDouyinCookies(url) {
+    if (this.settings.douyinWebview === false) this.settings.douyinWebview = true;
+    return this.captureDouyinMedia(
+      { kind: "douyin", id: "", url: url || "https://www.douyin.com/" },
+      { cookieOnly: true },
+    );
+  }
+
+  async applyBiliCookies() {    const cookies = this.settings.biliCookies || {};
     if (!Object.keys(cookies).length) return false;
     try {
       const electron = require("electron");
@@ -4194,7 +4997,8 @@ class VideoNoteStudio extends Plugin {
         meta.author = j.author_name || "";
         return meta;
       }
-      if (link.kind === "netdisk" || link.kind === "weixin" || link.kind === "web" || link.kind === "douyin" || link.kind === "short") {
+      if (link.kind === "douyin") return await this.douyinMeta(link, true);
+      if (link.kind === "netdisk" || link.kind === "weixin" || link.kind === "web" || link.kind === "short") {
         const html = await this.requestHtml(link.url);
         const pick = (re) => { const m = html.match(re); return m ? decodeEnt(m[1]).trim() : ""; };
         meta.title = pick(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i) ||
@@ -4323,6 +5127,10 @@ class VideoNoteStudio extends Plugin {
         "--sub-format", "vtt", "--no-playlist", "--no-warnings",
       ];
       if (link.kind === "bilibili" && this.biliCookieHeader()) args.push("--add-header", `Cookie: ${this.biliCookieHeader()}`);
+      if (link.kind === "douyin") {
+        if (link.mediaUrl) return []; // 抖音没有平台字幕，直链在 localTranscript 里直接转录
+        if (this.douyinCookieHeader()) args.push("--add-header", `Cookie: ${this.douyinCookieHeader()}`);
+      }
       args.push("-o", pathApi.join(tmp, "sub.%(ext)s"), link.url);
       await runProcess(this.settings.ytDlpPath, args, tmp);
       const files = fs.readdirSync(tmp).filter((f) => f.endsWith(".vtt"));
@@ -4358,7 +5166,14 @@ class VideoNoteStudio extends Plugin {
           "--language", this.settings.asrLanguage || "",
           "--ytdlp", this.settings.ytDlpPath || "yt-dlp",
         );
-        if (link.kind === "bilibili" && this.biliCookieHeader()) bridgeArgs.push("--cookie", this.biliCookieHeader());
+        if (link.mediaUrl) {
+          bridgeArgs.push("--media-url", link.mediaUrl);
+          bridgeArgs.push("--referer", link.kind === "douyin" ? "https://www.douyin.com/" : link.url);
+        } else if (link.kind === "bilibili" && this.biliCookieHeader()) {
+          bridgeArgs.push("--cookie", this.biliCookieHeader());
+        } else if (link.kind === "douyin" && this.douyinCookieHeader()) {
+          bridgeArgs.push("--cookie", this.douyinCookieHeader());
+        }
         const out = await runProcess(bin, bridgeArgs, workDir, 30 * 60 * 1000);
         const line = String(out).trim().split(/\r?\n/).filter(Boolean).pop() || "{}";
         const parsed = JSON.parse(line);
@@ -4431,23 +5246,69 @@ class VideoNoteStudio extends Plugin {
   async importLinkPrompt() { new UrlModal(this.app, (u) => this.importLink(u)).open(); }
 
   async importLink(rawUrl, opts = {}) {
-    const url = String(rawUrl || "").trim();
+    const url = extractUrl(rawUrl);
     if (!url) return null;
-    const link = detectLink(url);
+    let link = detectLink(url);
     link.url = url;
+    if (link.kind === "short") {
+      new Notice("正在解析分享短链…");
+      link = await this.resolveShortLink(url);
+    }
     new Notice(`解析 ${link.kind} 链接…`);
 
-    const meta = await this.fetchMeta(link);
+    // 抖音：没有播放直链就没法转录音频，先抓一次
+    if (link.kind === "douyin") {
+      const fromPlayer = opts.player && opts.player.link && opts.player.link.kind === "douyin"
+        ? opts.player.link : null;
+      if (fromPlayer) {
+        link.mediaUrl = fromPlayer.mediaUrl || "";
+        if (fromPlayer.title && !/^https?:/i.test(fromPlayer.title)) link.videoTitle = fromPlayer.title;
+        if (fromPlayer.author) link.videoAuthor = fromPlayer.author;
+        if (fromPlayer.stats) link.videoStats = fromPlayer.stats;
+        if (fromPlayer.desc) link.videoDesc = fromPlayer.desc;
+        if (fromPlayer.duration) link.duration = fromPlayer.duration;
+      }
+      link.mediaUrl = link.mediaUrl || "";
+      if (!link.mediaUrl) {
+        const cap = await this.captureDouyinMedia(link);
+        if (cap) {
+          link.mediaUrl = cap.mediaUrl || "";
+          if (cap.duration) link.duration = cap.duration;
+          if (cap.title) link.videoTitle = cap.title;
+          if (cap.desc) link.videoDesc = cap.desc;
+          if (cap.author) link.videoAuthor = cap.author;
+          if (cap.stats) link.videoStats = cap.stats;
+        }
+      }
+    }
+
+    const meta = link.kind === "douyin"
+      ? await this.douyinMeta(link)
+      : await this.fetchMeta(link);
+    if (link.videoTitle && (!meta.title || /^https?:/i.test(String(meta.title)))) meta.title = link.videoTitle;
+    if (link.videoAuthor && !meta.author) meta.author = link.videoAuthor;
+    if (link.videoStats && !meta.stats) meta.stats = link.videoStats;
+    if (link.videoDesc && (!meta.description || meta.description.length < link.videoDesc.length)) {
+      meta.description = link.videoDesc;
+    }
     let transcript = [];
     if (["bilibili", "youtube", "douyin", "direct"].includes(link.kind)) {
       transcript = await this.fetchTranscript(link);
+      if (!transcript.length) {
+        // 复用上次的转录缓存，避免同一视频重复跑 Whisper
+        const cached = await this.loadPanelData(link);
+        if (cached && Array.isArray(cached.transcript) && cached.transcript.length) {
+          transcript = cached.transcript;
+          new Notice("复用上次的转录缓存", 3000);
+        }
+      }
       if (!transcript.length && this.settings.asrEnabled) {
         new Notice("没有平台字幕，改用本地 Whisper 转录（可能要 1-3 分钟）…", 6000);
         transcript = await this.localTranscript(link);
       }
     }
     let article = "";
-    if (meta.html && ["weixin", "web", "netdisk", "douyin"].includes(link.kind)) {
+    if (meta.html && ["weixin", "web", "netdisk"].includes(link.kind)) {
       article = htmlToText(meta.html).slice(0, 20000);
     }
     const bodyText = transcript.length ? transcript.map((x) => x[1]).join("\n") : article;
@@ -4455,6 +5316,17 @@ class VideoNoteStudio extends Plugin {
     let summary = "";
     if (this.settings.autoSummarize && this.hasLlm() && bodyText) {
       try { summary = await this.summarize(meta, bodyText); } catch (e) { summary = `> 摘要生成失败：${e.message}`; }
+    }
+
+    // 平台没给标题（抖音常见）时，从摘要/转录里起一个像样的标题，别拿 URL 当标题
+    if (!meta.title || /^https?:/i.test(String(meta.title))) {
+      const sp = splitSummary(summary);
+      let derived = (sp.points || "").split("\n")[0].replace(/^[-*\s>]+/, "").replace(/\*\*/g, "").trim();
+      if (!derived && transcript.length) derived = String(transcript[0][1] || "").trim();
+      if (derived) {
+        derived = derived.replace(/[。！？!?].*$/, "").slice(0, 40);
+        if (derived.length >= 6) meta.title = derived;
+      }
     }
 
     const md = this.buildNote(link, meta, { transcript, article, summary });
@@ -4501,6 +5373,12 @@ class VideoNoteStudio extends Plugin {
     const body = [];
     // 不再写「播放」提示块；来源链接放在 frontmatter 的 source，点击可触发播放（见 registerObsidianProtocolHandler / 点击拦截）
 
+    if (meta.description && String(meta.description).trim()) {
+      body.push("## 简介", "", String(meta.description).trim().slice(0, 2000), "");
+    }
+    if (meta.stats) {
+      body.push(`> ${meta.stats}`, "");
+    }
     if (meta.tagList && meta.tagList.length) {
       body.push("## 标签", "", meta.tagList.map((t) => `\`${t}\``).join(" "), "");
     }
