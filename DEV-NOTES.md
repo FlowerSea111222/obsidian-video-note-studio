@@ -187,3 +187,12 @@ tags: [douyin, douyin-favorite, <文案里的 #话题>]
 `obsidian://vns?cmd=selftest` 会伪渲染设置页（`new VnsSettingTab(...).display()` 到游离 div），
 并把节点数 / 关键方法存在性 / 索引条数写到 `%TEMP%\vns-selftest.json`，
 用于改完代码后确认「设置页没炸、收藏方法和面板都在」。实测：`settingsNodes: 50`、`favIndexCount: 6`。
+
+### 8.7 迭代（第二轮）
+
+- 逐字稿改成折叠 callout：`> [!quote]- 视频逐字稿（N 段，点击时间戳跳转播放）`，收起不占版面。
+- 常驻定时同步：`favEveryMin`（分钟，0=关闭），`registerInterval` 每分钟检查一次，到点自动打开同步面板；
+  面板里用 `_favSyncing` 防重入。
+- 探测协议 `obsidian://vns?cmd=probe&u=<url>`：抓页面自己发的 `/aweme/v1/web/*` 接口，用于发现「喜欢 / 作品 / 收藏夹」端点。
+  实测：`/user/self?showTab=favorite` 只触发 social/count 等公共接口，**喜欢列表要页面内点 tab 才发请求**（按 URL 参数切 tab 无效），
+  所以「喜欢 / 作品 / 多收藏夹」需要先做页内点击 tab 再抓，属于下一轮。

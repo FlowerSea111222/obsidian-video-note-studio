@@ -2596,6 +2596,7 @@ const DEFAULT_SETTINGS = {
   favPageDelayMin: 6,
   favPageDelayMax: 12,
   favAutoSync: false,
+  favEveryMin: 0,
   favLastSync: 0,
 };
 
@@ -3646,6 +3647,7 @@ class DouyinFavSyncModal extends Modal {
 
   onClose() {
     this.stopped = true;
+    if (this.plugin) this.plugin._favSyncing = false;
     try { if (this.wv) this.wv.remove(); } catch (e) { /* ignore */ }
     this.wv = null;
     this.contentEl.empty();
@@ -3661,6 +3663,7 @@ class DouyinFavSyncModal extends Modal {
 
   async run() {
     const p = this.plugin;
+    p._favSyncing = true;
     const limit = Math.max(1, Math.min(200, parseInt(this.opts.limit || p.settings.favLimit, 10) || 20));
     const mode = this.opts.mode || (p.settings.favMode === "heavy" ? "heavy" : "light");
     const dmin = Math.max(1, Number(p.settings.favPageDelayMin) || 6);
@@ -3741,6 +3744,7 @@ class DouyinFavSyncModal extends Modal {
     if (skipped) parts.push(`跳过 ${skipped} 篇`);
     if (failed) parts.push(`失败 ${failed} 篇`);
     this.setStatus(`✅ 完成：${parts.join("，")}`);
+    p._favSyncing = false;
     p.settings.favLastSync = Date.now();
     try { await p.saveSettings(); } catch (e) { /* ignore */ }
     if (imported) new Notice(`抖音收藏：新增 ${imported} 篇笔记`, 8000);
@@ -3855,6 +3859,12 @@ class VnsSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("启动时自动同步").setDesc("开启后，Obsidian 启动时如果距上次同步超过 12 小时，就自动跑一次（会弹出同步窗口）")
       .addToggle((t) => t.setValue(!!this.plugin.settings.favAutoSync)
         .onChange(async (v) => { this.plugin.settings.favAutoSync = v; await this.plugin.saveSettings(); }));
+    new Setting(containerEl).setName("定时同步间隔（分钟）").setDesc("0 = 关闭；大于 0 时，Obsidian 开着就按间隔自动同步（会弹出同步窗口）。官方插件建议 ≥10 分钟、每批 5 条以内，太快容易触发风控")
+      .addText((t) => t.setValue(String(this.plugin.settings.favEveryMin || 0))
+        .onChange(async (v) => {
+          this.plugin.settings.favEveryMin = Math.max(0, Math.min(1440, parseInt(v, 10) || 0));
+          await this.plugin.saveSettings();
+        }));
     const favNow = new Setting(containerEl).setName("立即同步").setDesc("打开收藏同步面板，可先在里面登录抖音")
       .addButton((b) => b.setButtonText("同步收藏").setCta().onClick(() => this.plugin.openFavSync()));
     this.plugin.loadFavIndex().then((idx) => {
@@ -4495,6 +4505,7 @@ class VideoNoteStudio extends Plugin {
       this.rebuildIndex();
       this.maybeAutoSyncFavorites();
     });
+    this.registerInterval(window.setInterval(() => this.maybeTimerSync(), 60 * 1000));
     this.registerEvent(this.app.vault.on("rename", (f, old) => this.reindexFile(f, old)));
   }
 
@@ -4749,6 +4760,7 @@ class VideoNoteStudio extends Plugin {
   }
 
   async handleVnsProtocol(params) {
+    if (params && params.cmd === "probe") { await this.runProbe(params.u); return; }
     if (params && params.cmd === "selftest") { await this.runSelfTest(); return; }
     if (params && params.cmd === "favsync") { this.openFavSync({ limit: parseInt(params.l || "0", 10) || undefined, mode: params.mode || undefined }); return; }
     if (params && params.cmd === "fav") { await this.runDouyinFavDiag(params); return; }
@@ -4940,6 +4952,47 @@ class VideoNoteStudio extends Plugin {
     setTimeout(() => { try { modal.close(); } catch (e) { /* ignore */ } }, 40000);
   }
 
+  /** 抓某个抖音页面自己发的接口（用于发现收藏夹/喜欢/作品端点） */
+  async runProbe(url) {
+    const out = { at: new Date().toISOString(), codeVersion: "probe-r1", target: url };
+    const modal = new Modal(this.app);
+    const wv = document.createElement("webview");
+    wv.setAttribute("partition", DOUYIN_PARTITION);
+    wv.setAttribute("src", url);
+    wv.style.width = "100%";
+    wv.style.height = "100%";
+    modal.onOpen = () => {
+      modal.contentEl.addClass("vns-douyin-modal");
+      modal.contentEl.createEl("h3", { text: "接口探测" });
+      const box = modal.contentEl.createDiv({ cls: "vns-douyin-frame" });
+      box.appendChild(wv);
+    };
+    modal.onClose = () => { try { wv.remove(); } catch (e) { /* ignore */ } modal.contentEl.empty(); };
+    modal.open();
+    setTimeout(async () => {
+      try {
+        const js = `(() => {
+          const res = (performance.getEntriesByType('resource') || []).map((e) => e.name)
+            .filter((u) => u.indexOf('/aweme/v1/web/') >= 0)
+            .map((u) => u.split('&a_bogus')[0].split('&msToken')[0]);
+          const uniq = [];
+          for (const u of res) { const k = u.split('?')[0]; if (!uniq.some((x) => x.split('?')[0] === k)) uniq.push(u); }
+          return JSON.stringify({
+            href: location.href,
+            title: document.title,
+            uniq: uniq.slice(0, 12),
+            body: ((document.body && document.body.innerText) || '').slice(0, 300)
+          });
+        })()`;
+        out.raw = await wv.executeJavaScript(js, true);
+      } catch (e) { out.error = String((e && e.message) || e); }
+      try {
+        require("fs").writeFileSync(require("path").join(require("os").tmpdir(), "vns-probe.json"), JSON.stringify(out, null, 2));
+      } catch (e) { /* ignore */ }
+      try { modal.close(); } catch (e) { /* ignore */ }
+    }, 14000);
+  }
+
   /** 自检：伪渲染设置页 + 检查关键方法存在，结果写临时文件 */
   async runSelfTest() {
     const out = { at: new Date().toISOString(), codeVersion: "selftest-r1" };
@@ -4985,6 +5038,16 @@ class VideoNoteStudio extends Plugin {
   }
 
   openFavSync(opts) { new DouyinFavSyncModal(this.app, this, opts || {}).open(); }
+
+  /** 常驻定时同步：设置分钟数 > 0 时，按间隔自动跑（每分钟检查一次） */
+  maybeTimerSync() {
+    const min = Number(this.settings.favEveryMin) || 0;
+    if (min <= 0 || this._favSyncing) return;
+    const last = Number(this.settings.favLastSync) || 0;
+    if (Date.now() - last < min * 60 * 1000) return;
+    this._favSyncing = true;
+    try { this.openFavSync(); } catch (e) { this._favSyncing = false; }
+  }
 
   /** 启动时按需自动同步一次（默认关闭；距上次超过 12 小时才跑） */
   maybeAutoSyncFavorites() {
@@ -5182,9 +5245,9 @@ class VideoNoteStudio extends Plugin {
       body.push("## 配图", "", ...extra.imageRels.map((r) => `![[${r}]]`), "");
     }
     if (extra.transcript && extra.transcript.length) {
-      body.push("## 时间戳", "");
+      body.push(`> [!quote]- 视频逐字稿（${extra.transcript.length} 段，点击时间戳跳转播放）`);
       for (const [t, s] of extra.transcript) {
-        body.push(`- [${fmtTime(t)}](obsidian://vns?u=${encodeURIComponent(url)}&t=${Math.floor(t)}) ${s}`);
+        body.push(`> - [${fmtTime(t)}](obsidian://vns?u=${encodeURIComponent(url)}&t=${Math.floor(t)}) ${s}`);
       }
       body.push("");
     }
